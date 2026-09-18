@@ -29,12 +29,12 @@ export default function Navbar({ currentRoute, onNavigate, networkStatus = 'stab
 
         {/* Center / Right Navigation Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <nav className="flex items-center gap-1 bg-black/20 p-1 rounded-xl">
+          <nav className="flex items-center gap-1 bg-black/25 p-1 rounded-xl border border-white/10">
             <button
               onClick={() => onNavigate('home')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                 currentRoute === 'home'
-                  ? 'bg-brand-marigold text-white shadow-sm'
+                  ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-neutral-200 hover:text-white hover:bg-white/10'
               }`}
               title="Overview"
@@ -45,9 +45,9 @@ export default function Navbar({ currentRoute, onNavigate, networkStatus = 'stab
 
             <button
               onClick={() => onNavigate('patient')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                 currentRoute === 'patient'
-                  ? 'bg-brand-marigold text-white shadow-sm'
+                  ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-neutral-200 hover:text-white hover:bg-white/10'
               }`}
               title="Patient Triage & Call"
@@ -58,9 +58,9 @@ export default function Navbar({ currentRoute, onNavigate, networkStatus = 'stab
 
             <button
               onClick={() => onNavigate('doctor')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                 currentRoute === 'doctor'
-                  ? 'bg-brand-marigold text-white shadow-sm'
+                  ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-neutral-200 hover:text-white hover:bg-white/10'
               }`}
               title="Doctor Command Hub"
@@ -71,9 +71,9 @@ export default function Navbar({ currentRoute, onNavigate, networkStatus = 'stab
 
             <button
               onClick={() => onNavigate('asha')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                 currentRoute === 'asha'
-                  ? 'bg-brand-marigold text-white shadow-sm'
+                  ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-neutral-200 hover:text-white hover:bg-white/10'
               }`}
               title="ASHA Community Delivery"
