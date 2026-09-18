@@ -84,8 +84,11 @@ export default function Navbar({ currentRoute, onNavigate, networkStatus = 'stab
             </button>
           </nav>
 
-          <div className="hidden lg:block">
+          <div className="hidden md:block">
             <NetworkBadge status={networkStatus} rtt={rtt} />
+          </div>
+          <div className="md:hidden block">
+            <NetworkBadge status={networkStatus} rtt={rtt} compact={true} />
           </div>
         </div>
       </div>

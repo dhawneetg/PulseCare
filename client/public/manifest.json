@@ -1,0 +1,18 @@
+{
+  "short_name": "PulseCare",
+  "name": "PulseCare - Rural Telemedicine",
+  "description": "Low-bandwidth adaptive rural telemedicine platform with automatic WebRTC degradation and offline deterministic triage.",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "48x48 72x72 96x96 144x144 192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#123C38",
+  "theme_color": "#123C38"
+}

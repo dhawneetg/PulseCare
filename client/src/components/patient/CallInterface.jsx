@@ -52,6 +52,16 @@ export default function CallInterface({
             <div>Symptoms: <strong className="text-neutral-900">{patientData?.symptoms?.join(', ')}</strong></div>
             <div>Vitals: <strong className="text-neutral-900 font-mono">Temp: {patientData?.vitals?.temp}°F | BP: {patientData?.vitals?.bp}</strong></div>
           </div>
+
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={onEndCall}
+              className="px-6 py-2.5 rounded-xl border border-neutral-300 text-neutral-700 hover:bg-neutral-100 text-xs font-semibold transition-colors inline-flex items-center gap-2 shadow-xs"
+            >
+              <span>Cancel & Exit Waiting Room</span>
+            </button>
+          </div>
         </div>
       </div>
     );
