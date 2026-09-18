@@ -3,6 +3,8 @@ import { PhoneCall, Clock, CheckCircle2, User, Stethoscope } from 'lucide-react'
 import VideoPlayer from '../webrtc/VideoPlayer.jsx';
 import CallControls from '../webrtc/CallControls.jsx';
 
+import EmergencyTextRelay from '../common/EmergencyTextRelay.jsx';
+
 export default function CallInterface({
   patientData,
   queuePosition = 1,
@@ -12,12 +14,18 @@ export default function CallInterface({
   remoteStream = null,
   isAudioOnly = false,
   rtt = null,
+  networkStatus = 'stable',
   isAudioMuted = false,
   isVideoDisabled = false,
   onToggleAudio,
   onToggleVideo,
   onEndCall,
   onSimulateDegradation,
+  onSetNetworkMode,
+  messages = [],
+  onSendMessage,
+  isChatOpen = false,
+  onToggleChat,
 }) {
   if (!isInCall) {
     return (
@@ -98,8 +106,24 @@ export default function CallInterface({
         onToggleVideo={onToggleVideo}
         onEndCall={onEndCall}
         onSimulateDegradation={onSimulateDegradation}
+        onSetNetworkMode={onSetNetworkMode}
+        networkStatus={networkStatus}
+        currentRtt={rtt}
         isDegraded={isAudioOnly}
+        isChatOpen={isChatOpen}
+        onToggleChat={onToggleChat}
       />
+
+      {/* Emergency Low-Bandwidth Text Relay Drawer (Active during call / fallback) */}
+      {(isChatOpen || networkStatus === 'offline') && (
+        <EmergencyTextRelay
+          messages={messages}
+          onSendMessage={onSendMessage}
+          currentUserRole="Patient"
+          isOffline={networkStatus === 'offline'}
+          isAudioOnly={isAudioOnly}
+        />
+      )}
     </div>
   );
 }

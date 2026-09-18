@@ -39,6 +39,7 @@ export function useWebRTC({
   onRemoteStream,
   onDegradationStateChange,
   onRttUpdate,
+  onChatMessage,
   onSendOffer,
   onSendAnswer,
   onSendIceCandidate,
@@ -96,6 +97,20 @@ export function useWebRTC({
   }, []);
 
   /**
+   * Send clinical emergency text message over RTCDataChannel
+   */
+  const sendChatMessage = useCallback((text, senderName) => {
+    const payload = {
+      type: DATA_CHANNEL_MESSAGES.CHAT_MESSAGE,
+      text,
+      sender: senderName || 'Peer',
+      timestamp: Date.now(),
+    };
+    sendDataChannelMessage(payload);
+    return payload;
+  }, [sendDataChannelMessage]);
+
+  /**
    * Apply bandwidth degradation or restoration
    */
   const setDegradedMode = useCallback((degraded, rttValue) => {
@@ -123,53 +138,80 @@ export function useWebRTC({
 
   /**
    * Flow C: Adaptive Bandwidth Fallback Loop
-   * Polls getStats() every 2000ms strictly measuring candidate-pair RTT
+   * Polls getStats() and probes active network latency to accurately catch DevTools throttling & real carrier spikes.
    */
   const startStatsMonitoring = useCallback(() => {
     if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
 
     statsIntervalRef.current = setInterval(async () => {
+      let candidateRtt = null;
+      let probeRtt = null;
+
+      // 1. Measure WebRTC Candidate Pair RTT if connected
       const pc = peerConnectionRef.current;
-      if (!pc || pc.connectionState !== 'connected') return;
+      if (pc && pc.connectionState === 'connected') {
+        try {
+          const stats = await pc.getStats();
+          let selectedCandidatePair = null;
 
-      try {
-        const stats = await pc.getStats();
-        let selectedCandidatePair = null;
-
-        stats.forEach((report) => {
-          if (
-            report.type === 'candidate-pair' &&
-            (report.selected || (report.state === 'succeeded' && report.nominated))
-          ) {
-            selectedCandidatePair = report;
-          }
-        });
-
-        // Fallback: find any active candidate-pair with RTT available
-        if (!selectedCandidatePair) {
           stats.forEach((report) => {
-            if (report.type === 'candidate-pair' && typeof report.currentRoundTripTime !== 'undefined') {
+            if (
+              report.type === 'candidate-pair' &&
+              (report.selected || (report.state === 'succeeded' && report.nominated))
+            ) {
               selectedCandidatePair = report;
             }
           });
-        }
 
-        if (selectedCandidatePair && typeof selectedCandidatePair.currentRoundTripTime !== 'undefined') {
-          const rttMs = selectedCandidatePair.currentRoundTripTime * 1000;
-          setCurrentRtt(rttMs);
-          if (onRttUpdate) onRttUpdate(rttMs);
-
-          // Latency threshold evaluation (500ms)
-          if (rttMs > RTT_THRESHOLD_MS && !isAudioOnly) {
-            console.warn(`[PulseCare] High Latency Detected: RTT=${rttMs.toFixed(1)}ms > 500ms. Engaging audio-only fallback.`);
-            setDegradedMode(true, rttMs);
-          } else if (rttMs <= RTT_THRESHOLD_MS && isAudioOnly) {
-            console.log(`[PulseCare] Network Latency Restored: RTT=${rttMs.toFixed(1)}ms <= 500ms. Restoring video stream.`);
-            setDegradedMode(false, rttMs);
+          if (!selectedCandidatePair) {
+            stats.forEach((report) => {
+              if (report.type === 'candidate-pair' && typeof report.currentRoundTripTime !== 'undefined') {
+                selectedCandidatePair = report;
+              }
+            });
           }
+
+          if (selectedCandidatePair && typeof selectedCandidatePair.currentRoundTripTime !== 'undefined') {
+            candidateRtt = selectedCandidatePair.currentRoundTripTime * 1000;
+          }
+        } catch (err) {
+          console.warn('[PulseCare] Error reading getStats:', err);
         }
-      } catch (err) {
-        console.warn('[PulseCare] Error reading getStats:', err);
+      }
+
+      // 2. Active network probe (accurately measures Chrome DevTools Slow 3G / Fast 3G throttling & carrier latency)
+      if (window.navigator.onLine) {
+        const probeStart = performance.now();
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 3500);
+          await fetch('/health?probe=' + Date.now(), { 
+            method: 'GET', 
+            signal: controller.signal, 
+            cache: 'no-store' 
+          });
+          clearTimeout(timer);
+          probeRtt = performance.now() - probeStart;
+        } catch (e) {
+          // If aborted or failed, network is severely throttled / degraded
+          probeRtt = 1100;
+        }
+      } else {
+        probeRtt = 999;
+      }
+
+      // Effective RTT reflects the actual network bottleneck
+      const effectiveRtt = Math.max(candidateRtt || 0, probeRtt || 0) || 45;
+      setCurrentRtt(effectiveRtt);
+      if (onRttUpdate) onRttUpdate(effectiveRtt);
+
+      // Latency threshold evaluation (500ms cliff per PRD Section 3 & Acceptance Criteria #1)
+      if (effectiveRtt > RTT_THRESHOLD_MS && !isAudioOnly) {
+        console.warn(`[PulseCare] High Latency Detected: RTT=${effectiveRtt.toFixed(0)}ms > 500ms. Engaging audio-only fallback.`);
+        setDegradedMode(true, effectiveRtt);
+      } else if (effectiveRtt <= RTT_THRESHOLD_MS && isAudioOnly && window.navigator.onLine) {
+        console.log(`[PulseCare] Latency Restored: RTT=${effectiveRtt.toFixed(0)}ms <= 500ms. Restoring video stream.`);
+        setDegradedMode(false, effectiveRtt);
       }
     }, 2000);
   }, [isAudioOnly, setDegradedMode, onRttUpdate]);
@@ -193,6 +235,8 @@ export function useWebRTC({
         } else if (data.type === DATA_CHANNEL_MESSAGES.NETWORK_RESTORED) {
           setIsAudioOnly(false);
           if (onDegradationStateChange) onDegradationStateChange(false, data.rtt * 1000);
+        } else if (data.type === DATA_CHANNEL_MESSAGES.CHAT_MESSAGE) {
+          if (onChatMessage) onChatMessage(data);
         }
       } catch (e) {
         console.error('[PulseCare] Failed to parse DataChannel payload:', e);
@@ -202,7 +246,7 @@ export function useWebRTC({
     channel.onclose = () => {
       console.log(`[PulseCare] RTCDataChannel '${channel.label}' closed.`);
     };
-  }, [onDegradationStateChange]);
+  }, [onDegradationStateChange, onChatMessage]);
 
   /**
    * Initialize RTCPeerConnection instance
@@ -416,6 +460,7 @@ export function useWebRTC({
     handleReceiveAnswer,
     handleAddIceCandidate,
     setDegradedMode,
+    sendChatMessage,
     endCall,
   };
 }

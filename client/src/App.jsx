@@ -11,9 +11,9 @@ import VideoPlayer from './components/webrtc/VideoPlayer.jsx';
 import CallControls from './components/webrtc/CallControls.jsx';
 import { useSignaling } from './hooks/useSignaling.js';
 import { useWebRTC } from './hooks/useWebRTC.js';
-import { MOCK_PATIENTS, MOCK_DOCTOR, MOCK_PRESCRIPTIONS } from './utils/mockData.js';
 import LandingPage from './components/common/LandingPage.jsx';
 import { CommandHeaderMetrics, VillageKioskMatrix, LocalEncryptedStorageWidget } from './components/doctor/TelecommandWidgets.jsx';
+import EmergencyTextRelay from './components/common/EmergencyTextRelay.jsx';
 
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState(() => {
@@ -40,6 +40,8 @@ export default function App() {
   const [simulatedRtt, setSimulatedRtt] = useState(120);
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoDisabled, setIsVideoDisabled] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // WebRTC Hook
   const webrtc = useWebRTC({
@@ -52,6 +54,10 @@ export default function App() {
     },
     onRttUpdate: (rttValue) => {
       if (rttValue) setSimulatedRtt(rttValue);
+    },
+    onChatMessage: (msg) => {
+      setChatMessages((prev) => [...prev, msg]);
+      setIsChatOpen(true);
     },
     onSendOffer: (offer, roomId) => {
       signaling.sendOffer(offer, roomId);
@@ -170,16 +176,45 @@ export default function App() {
     }
   };
 
-  // Toggle simulated network cliff (>500ms RTT fallback)
-  const handleSimulateDegradation = () => {
-    if (networkStatus === 'stable') {
+  // Multi-tier Network State Switcher: 4G -> 3G -> 2G (Audio Fallback) -> Offline (Text Relay)
+  const handleSetNetworkMode = (mode) => {
+    if (mode === '4g') {
+      webrtc.setDegradedMode(false, 38);
+      setNetworkStatus('stable');
+      setSimulatedRtt(38);
+    } else if (mode === '3g') {
+      webrtc.setDegradedMode(false, 185);
+      setNetworkStatus('stable');
+      setSimulatedRtt(185);
+    } else if (mode === '2g') {
       webrtc.setDegradedMode(true, 580);
       setNetworkStatus('degraded');
       setSimulatedRtt(580);
+    } else if (mode === 'offline') {
+      webrtc.setDegradedMode(true, 999);
+      setNetworkStatus('offline');
+      setSimulatedRtt(999);
+      setIsChatOpen(true);
+    }
+  };
+
+  const handleSimulateDegradation = (targetMode) => {
+    if (targetMode && typeof targetMode === 'string') {
+      handleSetNetworkMode(targetMode);
+      return;
+    }
+    if (networkStatus === 'stable') {
+      handleSetNetworkMode('2g');
     } else {
-      webrtc.setDegradedMode(false, 95);
-      setNetworkStatus('stable');
-      setSimulatedRtt(95);
+      handleSetNetworkMode('4g');
+    }
+  };
+
+  const handleSendChatMessage = (text) => {
+    const role = currentRoute === 'doctor' ? 'Doctor' : 'Patient';
+    const payload = webrtc.sendChatMessage(text, role);
+    if (payload) {
+      setChatMessages((prev) => [...prev, payload]);
     }
   };
 
@@ -230,12 +265,18 @@ export default function App() {
                 remoteStream={webrtc.remoteStream}
                 isAudioOnly={networkStatus === 'degraded'}
                 rtt={simulatedRtt}
+                networkStatus={networkStatus}
                 isAudioMuted={isAudioMuted}
                 isVideoDisabled={isVideoDisabled}
                 onToggleAudio={() => setIsAudioMuted(!isAudioMuted)}
                 onToggleVideo={() => setIsVideoDisabled(!isVideoDisabled)}
                 onEndCall={handleEndConsultation}
                 onSimulateDegradation={handleSimulateDegradation}
+                onSetNetworkMode={handleSetNetworkMode}
+                messages={chatMessages}
+                onSendMessage={handleSendChatMessage}
+                isChatOpen={isChatOpen}
+                onToggleChat={() => setIsChatOpen(!isChatOpen)}
               />
             ) : (
               <SymptomChecker onJoinQueue={handleJoinQueue} />
@@ -294,8 +335,24 @@ export default function App() {
                       onToggleVideo={() => setIsVideoDisabled(!isVideoDisabled)}
                       onEndCall={handleEndConsultation}
                       onSimulateDegradation={handleSimulateDegradation}
+                      onSetNetworkMode={handleSetNetworkMode}
+                      networkStatus={networkStatus}
+                      currentRtt={simulatedRtt}
                       isDegraded={networkStatus === 'degraded'}
+                      isChatOpen={isChatOpen}
+                      onToggleChat={() => setIsChatOpen(!isChatOpen)}
                     />
+
+                    {/* Emergency Clinical Text Relay for Doctor */}
+                    {(isChatOpen || networkStatus === 'offline') && (
+                      <EmergencyTextRelay
+                        messages={chatMessages}
+                        onSendMessage={handleSendChatMessage}
+                        currentUserRole="Doctor"
+                        isOffline={networkStatus === 'offline'}
+                        isAudioOnly={networkStatus === 'degraded'}
+                      />
+                    )}
                   </div>
                 )}
 
