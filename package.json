@@ -4,13 +4,19 @@
   "private": true,
   "description": "PulseCare - Low-bandwidth rural telemedicine with adaptive WebRTC and offline triage",
   "scripts": {
+    "postinstall": "npm --prefix client install",
+    "build": "npm --prefix client install && npm --prefix client run build",
+    "start": "node server/server.js",
     "server": "npm --prefix server start",
     "client": "npm --prefix client run dev",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "build": "npm --prefix client run build",
-    "start": "node server/server.js"
+    "dev": "concurrently \"npm run server\" \"npm run client\""
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
   }
 }
