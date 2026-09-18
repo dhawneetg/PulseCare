@@ -15,6 +15,7 @@ export default function CallInterface({
   isAudioOnly = false,
   rtt = null,
   networkStatus = 'stable',
+  cameraError = null,
   isAudioMuted = false,
   isVideoDisabled = false,
   onToggleAudio,
@@ -77,6 +78,14 @@ export default function CallInterface({
 
   return (
     <div className="max-w-xl mx-auto w-full px-4 py-4 space-y-4">
+      {/* Camera / Permission Alert */}
+      {cameraError && (
+        <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-start gap-2 shadow-2xs">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <span>{cameraError}</span>
+        </div>
+      )}
+
       {/* Remote Doctor Feed */}
       <div className="relative">
         <VideoPlayer

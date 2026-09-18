@@ -24,9 +24,18 @@ export const ICE_SERVERS = [
 ];
 
 // Baseline media constraints requested at call start per architecture.md Section 3
+// Uses mobile-friendly ideal constraints with front camera preference
 export const MEDIA_CONSTRAINTS = {
-  video: { width: 320, height: 240, frameRate: 15 },
-  audio: true,
+  video: {
+    facingMode: 'user',
+    width: { ideal: 640, min: 240 },
+    height: { ideal: 480, min: 240 },
+    frameRate: { ideal: 15, max: 30 },
+  },
+  audio: {
+    echoCancellation: true,
+    noiseSuppression: true,
+  },
 };
 
 const RTT_THRESHOLD_MS = 500; // 500ms round trip time cliff threshold
@@ -60,10 +69,23 @@ export function useWebRTC({
   const iceCandidateQueueRef = useRef([]);
 
   /**
-   * Acquire local user media with 320x240/15fps baseline.
-   * Gracefully falls back to audio-only if camera access is denied.
+   * Acquire local user media with mobile-safe 3-stage fallback.
+   * Stage 1: Front camera with ideal resolution
+   * Stage 2: Generic { video: true, audio: true } (bypasses OverconstrainedError)
+   * Stage 3: Audio-only fallback
    */
   const startLocalMedia = useCallback(async () => {
+    // Check for Secure Context / MediaDevices availability (Critical for mobile devices)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      const errorMsg = window.isSecureContext === false
+        ? 'Mobile browsers require HTTPS for camera and microphone. Please open via HTTPS (e.g. Render deployment or tunnel).'
+        : 'Camera & Microphone access is not supported or blocked in this browser.';
+      console.error('[PulseCare]', errorMsg);
+      setCameraError(errorMsg);
+      return null;
+    }
+
+    // Stage 1: Ideal mobile constraints with selfie camera
     try {
       const stream = await navigator.mediaDevices.getUserMedia(MEDIA_CONSTRAINTS);
       localStreamRef.current = stream;
@@ -71,18 +93,29 @@ export function useWebRTC({
       setCameraError(null);
       return stream;
     } catch (err) {
-      console.warn('[PulseCare] Video capture denied or unavailable, attempting audio-only:', err);
+      console.warn('[PulseCare] Stage 1 constraints failed, attempting generic video/audio:', err);
+      // Stage 2: Generic video & audio (resolves mobile OverconstrainedError)
       try {
-        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        localStreamRef.current = audioStream;
-        setLocalStream(audioStream);
-        setCameraError('Camera unavailable. Continuing with audio only.');
-        setIsAudioOnly(true);
-        return audioStream;
-      } catch (audioErr) {
-        console.error('[PulseCare] Fatal: Microphone access also denied:', audioErr);
-        setCameraError('Microphone permission required for medical consultation.');
-        return null;
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localStreamRef.current = stream;
+        setLocalStream(stream);
+        setCameraError(null);
+        return stream;
+      } catch (videoErr) {
+        console.warn('[PulseCare] Video capture denied or unavailable, attempting audio-only:', videoErr);
+        // Stage 3: Audio-only fallback
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          localStreamRef.current = audioStream;
+          setLocalStream(audioStream);
+          setCameraError('Camera unavailable. Continuing with audio only.');
+          setIsAudioOnly(true);
+          return audioStream;
+        } catch (audioErr) {
+          console.error('[PulseCare] Fatal: Microphone permission also denied:', audioErr);
+          setCameraError('Microphone permission required for medical consultation.');
+          return null;
+        }
       }
     }
   }, []);

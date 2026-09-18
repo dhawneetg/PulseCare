@@ -266,6 +266,7 @@ export default function App() {
                 isAudioOnly={networkStatus === 'degraded'}
                 rtt={simulatedRtt}
                 networkStatus={networkStatus}
+                cameraError={webrtc.cameraError}
                 isAudioMuted={isAudioMuted}
                 isVideoDisabled={isVideoDisabled}
                 onToggleAudio={() => setIsAudioMuted(!isAudioMuted)}
