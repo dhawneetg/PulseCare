@@ -1,5 +1,5 @@
 import React from 'react';
-import { PhoneCall, Clock, CheckCircle2, User, Stethoscope } from 'lucide-react';
+import { PhoneCall, Clock, CheckCircle2, User, Stethoscope, AlertTriangle } from 'lucide-react';
 import VideoPlayer from '../webrtc/VideoPlayer.jsx';
 import CallControls from '../webrtc/CallControls.jsx';
 

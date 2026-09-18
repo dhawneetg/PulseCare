@@ -13,6 +13,10 @@ export default defineConfig({
         ws: true,
         changeOrigin: true,
       },
+      '/health': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
     },
   },
 });

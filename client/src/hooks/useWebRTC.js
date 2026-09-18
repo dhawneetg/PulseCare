@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { DATA_CHANNEL_MESSAGES } from '../types/index.js';
 
-// Canonical ICE config per architecture.md Section 3 (STUN + TURN Open Relay Project with full multi-port traversal)
+// Canonical ICE config per architecture.md Section 3 (STUN + Multi-Port TURN + Secure TLS TURN for mobile carrier traversal)
 export const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
   { urls: 'stun:openrelay.metered.ca:80' },
   {
     urls: 'turn:openrelay.metered.ca:80',
@@ -21,20 +23,31 @@ export const ICE_SERVERS = [
     username: 'openrelayproject',
     credential: 'openrelayproject',
   },
+  {
+    urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turns:openrelay.metered.ca:5349?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
 ];
 
 // Baseline media constraints requested at call start per architecture.md Section 3
-// Uses mobile-friendly ideal constraints with front camera preference
+// Uses mobile-friendly ideal constraints with portrait/landscape tolerance and front camera preference
 export const MEDIA_CONSTRAINTS = {
   video: {
     facingMode: 'user',
-    width: { ideal: 640, min: 240 },
-    height: { ideal: 480, min: 240 },
-    frameRate: { ideal: 15, max: 30 },
+    width: { ideal: 640 },
+    height: { ideal: 480 },
+    frameRate: { ideal: 24, max: 30 },
   },
   audio: {
     echoCancellation: true,
     noiseSuppression: true,
+    autoGainControl: true,
   },
 };
 
@@ -63,61 +76,101 @@ export function useWebRTC({
   // Persistent refs to prevent stale closure bugs inside event listeners
   const peerConnectionRef = useRef(null);
   const localStreamRef = useRef(null);
+  const mediaPromiseRef = useRef(null);
   const dataChannelRef = useRef(null);
   const statsIntervalRef = useRef(null);
   const roomIdRef = useRef(null);
   const iceCandidateQueueRef = useRef([]);
 
   /**
-   * Acquire local user media with mobile-safe 3-stage fallback.
+   * Acquire local user media with mobile-safe 3-stage fallback and concurrency lock.
    * Stage 1: Front camera with ideal resolution
-   * Stage 2: Generic { video: true, audio: true } (bypasses OverconstrainedError)
+   * Stage 2: Generic { video: true, audio: true } (bypasses mobile OverconstrainedError)
    * Stage 3: Audio-only fallback
    */
   const startLocalMedia = useCallback(async () => {
-    // Check for Secure Context / MediaDevices availability (Critical for mobile devices)
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      const errorMsg = window.isSecureContext === false
-        ? 'Mobile browsers require HTTPS for camera and microphone. Please open via HTTPS (e.g. Render deployment or tunnel).'
-        : 'Camera & Microphone access is not supported or blocked in this browser.';
-      console.error('[PulseCare]', errorMsg);
-      setCameraError(errorMsg);
-      return null;
+    // If a media acquisition is currently pending, return the shared in-flight promise
+    if (mediaPromiseRef.current) {
+      return mediaPromiseRef.current;
     }
 
-    // Stage 1: Ideal mobile constraints with selfie camera
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia(MEDIA_CONSTRAINTS);
-      localStreamRef.current = stream;
-      setLocalStream(stream);
-      setCameraError(null);
-      return stream;
-    } catch (err) {
-      console.warn('[PulseCare] Stage 1 constraints failed, attempting generic video/audio:', err);
-      // Stage 2: Generic video & audio (resolves mobile OverconstrainedError)
+    // If local stream already active and has live tracks, reuse it directly
+    if (localStreamRef.current && localStreamRef.current.getTracks().some((t) => t.readyState === 'live')) {
+      return localStreamRef.current;
+    }
+
+    const acquireMedia = async () => {
+      // Check for Secure Context / MediaDevices availability (Critical for mobile devices)
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const isPlainHttp = window.location.protocol === 'http:' && 
+          window.location.hostname !== 'localhost' && 
+          window.location.hostname !== '127.0.0.1';
+        const errorMsg = isPlainHttp
+          ? 'Mobile browsers require HTTPS for camera and microphone. Please open via Render HTTPS URL or an SSL tunnel.'
+          : 'Camera & Microphone access is not supported or blocked in this browser.';
+        console.error('[PulseCare]', errorMsg);
+        setCameraError(errorMsg);
+        return null;
+      }
+
+      let stream = null;
+
+      // Stage 1: Ideal mobile constraints with front/selfie camera
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        localStreamRef.current = stream;
-        setLocalStream(stream);
+        stream = await navigator.mediaDevices.getUserMedia(MEDIA_CONSTRAINTS);
         setCameraError(null);
-        return stream;
-      } catch (videoErr) {
-        console.warn('[PulseCare] Video capture denied or unavailable, attempting audio-only:', videoErr);
-        // Stage 3: Audio-only fallback
+      } catch (err) {
+        console.warn('[PulseCare] Stage 1 constraints failed, attempting generic video/audio:', err);
+        // Stage 2: Generic video & audio (resolves mobile OverconstrainedError)
         try {
-          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          localStreamRef.current = audioStream;
-          setLocalStream(audioStream);
-          setCameraError('Camera unavailable. Continuing with audio only.');
-          setIsAudioOnly(true);
-          return audioStream;
-        } catch (audioErr) {
-          console.error('[PulseCare] Fatal: Microphone permission also denied:', audioErr);
-          setCameraError('Microphone permission required for medical consultation.');
-          return null;
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          setCameraError(null);
+        } catch (videoErr) {
+          console.warn('[PulseCare] Video capture denied or unavailable, attempting audio-only:', videoErr);
+          // Stage 3: Audio-only fallback
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            setCameraError('Camera unavailable. Continuing with audio only.');
+            setIsAudioOnly(true);
+          } catch (audioErr) {
+            console.error('[PulseCare] Fatal: Microphone permission also denied:', audioErr);
+            setCameraError('Microphone permission required for medical consultation.');
+            return null;
+          }
         }
       }
-    }
+
+      if (stream) {
+        localStreamRef.current = stream;
+        setLocalStream(stream);
+
+        // If peer connection already exists, dynamically attach tracks
+        const pc = peerConnectionRef.current;
+        if (pc && pc.signalingState !== 'closed') {
+          const currentSenders = pc.getSenders();
+          stream.getTracks().forEach((track) => {
+            const existingSender = currentSenders.find((s) => s.track && s.track.kind === track.kind);
+            if (existingSender) {
+              existingSender.replaceTrack(track).catch((e) => console.warn('[PulseCare] replaceTrack error:', e));
+            } else {
+              try {
+                pc.addTrack(track, stream);
+              } catch (e) {
+                console.warn('[PulseCare] addTrack error:', e);
+              }
+            }
+          });
+        }
+      }
+
+      return stream;
+    };
+
+    mediaPromiseRef.current = acquireMedia().finally(() => {
+      mediaPromiseRef.current = null;
+    });
+
+    return mediaPromiseRef.current;
   }, []);
 
   /**
@@ -286,6 +339,11 @@ export function useWebRTC({
    */
   const createPeerConnection = useCallback((roomId) => {
     roomIdRef.current = roomId;
+    if (peerConnectionRef.current) {
+      try {
+        peerConnectionRef.current.close();
+      } catch (e) {}
+    }
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     peerConnectionRef.current = pc;
 
