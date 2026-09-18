@@ -56,10 +56,10 @@ export default function CallInterface({
 
           <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 text-left text-xs text-neutral-600 space-y-1.5">
             <div className="font-bold text-neutral-900 text-sm mb-1">Consultation Details:</div>
-            <div>Patient: <strong className="text-neutral-900">{patientData?.name} ({patientData?.age}y)</strong></div>
-            <div>Location: <strong className="text-neutral-900">{patientData?.village}</strong></div>
-            <div>Symptoms: <strong className="text-neutral-900">{patientData?.symptoms?.join(', ')}</strong></div>
-            <div>Vitals: <strong className="text-neutral-900 font-mono">Temp: {patientData?.vitals?.temp}°F | BP: {patientData?.vitals?.bp}</strong></div>
+            <div>Patient: <strong className="text-neutral-900">{patientData?.name || 'Anonymous Patient'} ({patientData?.age || 30}y)</strong></div>
+            <div>Location: <strong className="text-neutral-900">{patientData?.village || 'Rampur Village'}</strong></div>
+            <div>Symptoms: <strong className="text-neutral-900">{Array.isArray(patientData?.symptoms) ? patientData.symptoms.join(', ') : (patientData?.symptoms || 'General Consultation')}</strong></div>
+            <div>Vitals: <strong className="text-neutral-900 font-mono">Temp: {patientData?.vitals?.temp || '98.6'}°F | BP: {patientData?.vitals?.bp || '120/80'}</strong></div>
           </div>
 
           <div className="pt-2">
