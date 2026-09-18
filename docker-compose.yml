@@ -1,0 +1,17 @@
+services:
+  pulsecare:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pulsecare-app
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

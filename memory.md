@@ -6,19 +6,19 @@
 
 ```yaml
 # CURRENT STATE
-active_phase: "Phase 5: Cross-Device Verification, Hardening & Demo Prep"
-last_completed_task: "Resolved 4 critical stability bottlenecks: preserved audio element in VideoPlayer during degradation, buffered early ICE candidates in useWebRTC, added Vite /socket.io proxy for tunnel/cross-device support, and enhanced PatientQueue with live status indicators."
-current_focus: "Ready for live demonstration: verify 2-tab local test or cross-device mobile test via HTTPS tunnel."
+active_phase: "Phase 5: Production Deployment Hardening & Live Demo Ready"
+last_completed_task: "Perfected production deployment & design specs: multi-stage Dockerfile, docker-compose, Render blueprint (render.yaml), Heroku/Railway Procfile, server caching & graceful shutdown, PWA manifest + SVG favicon, mobile responsive NetworkBadge, and fully expanded design.md specification."
+current_focus: "Ready for cloud deployment (Render, Railway, Docker) and live cross-device / local demonstration."
 
 # ENVIRONMENT
 frontend_port: 5173
 backend_port: 5000
-ws_endpoint: "Proxied through Vite (/socket.io)"
-server_status: "ONLINE — Signaling running on :5000, Vite running on :5173"
-cross_device_test_status: "READY FOR DEMO — Accessible via http://localhost:5173 or HTTPS tunnel (ngrok http 5173)"
+ws_endpoint: "Proxied through Vite (/socket.io) in dev; served unified on single port in production"
+server_status: "ONLINE & PRODUCTION READY — Signaling & Static SPA on :5000, Vite dev on :5173"
+cross_device_test_status: "READY FOR DEPLOYMENT & DEMO — Verified SPA routes and /health endpoint (HTTP 200)"
 
 # KNOWN ISSUES / BUGS
-- (All 4 critical demo and WebRTC stability issues resolved)
+- None (All build, signaling, routing, and deployment configurations verified)
 
 # CRITICAL REMINDERS — do not drop these across a long session
 - Product name is "PulseCare." Never "Sanjeevani Connect" or bare "Sanjeevani" — that name is retired. "eSanjeevani" (the real government platform) is a separate, correct term used only for comparison.
