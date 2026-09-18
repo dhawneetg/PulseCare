@@ -1,11 +1,23 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { DATA_CHANNEL_MESSAGES } from '../types/index.js';
 
-// Canonical ICE config per architecture.md Section 3 (STUN + TURN Open Relay Project)
+// Canonical ICE config per architecture.md Section 3 (STUN + TURN Open Relay Project with full multi-port traversal)
 export const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:openrelay.metered.ca:80' },
   {
     urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
     username: 'openrelayproject',
     credential: 'openrelayproject',
   },
@@ -207,12 +219,17 @@ export function useWebRTC({
       });
     }
 
-    // Handle remote track reception
+    // Handle remote track reception (robust to single-track or multi-stream events)
     pc.ontrack = (event) => {
       console.log('[PulseCare] Remote track received:', event.track.kind);
-      const [remoteMediaStream] = event.streams;
-      setRemoteStream(remoteMediaStream);
-      if (onRemoteStream) onRemoteStream(remoteMediaStream);
+      if (event.streams && event.streams[0]) {
+        setRemoteStream(event.streams[0]);
+        if (onRemoteStream) onRemoteStream(event.streams[0]);
+      } else {
+        const fallbackStream = new MediaStream([event.track]);
+        setRemoteStream(fallbackStream);
+        if (onRemoteStream) onRemoteStream(fallbackStream);
+      }
     };
 
     // Relay ICE candidates

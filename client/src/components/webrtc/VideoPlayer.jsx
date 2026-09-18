@@ -10,18 +10,38 @@ export default function VideoPlayer({
   isMuted = false,
 }) {
   const videoRef = useRef(null);
+  const [playBlocked, setPlayBlocked] = React.useState(false);
 
   useEffect(() => {
     if (videoRef.current && stream) {
       if (videoRef.current.srcObject !== stream) {
         videoRef.current.srcObject = stream;
       }
-      videoRef.current.play().catch(() => {});
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setPlayBlocked(false);
+          })
+          .catch((err) => {
+            console.warn('[PulseCare] Autoplay blocked on device, requiring tap:', err);
+            setPlayBlocked(true);
+          });
+      }
     }
   }, [stream]);
 
+  const handleManualPlay = () => {
+    if (videoRef.current) {
+      videoRef.current.play().then(() => setPlayBlocked(false)).catch(() => {});
+    }
+  };
+
   return (
-    <div className="relative w-full aspect-video bg-neutral-900 rounded-2xl overflow-hidden shadow-sm flex items-center justify-center border-2 border-neutral-800">
+    <div 
+      onClick={playBlocked ? handleManualPlay : undefined}
+      className="relative w-full aspect-video bg-neutral-900 rounded-2xl overflow-hidden shadow-sm flex items-center justify-center border-2 border-neutral-800"
+    >
       {/* Active Video & Audio Stream - Always kept mounted so audio tracks play uninterrupted */}
       {stream && (
         <video
@@ -33,6 +53,19 @@ export default function VideoPlayer({
             isAudioOnly ? 'hidden' : 'block'
           }`}
         />
+      )}
+
+      {/* Mobile Autoplay Permission Overlay */}
+      {playBlocked && !isLocal && (
+        <div className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center p-4 text-center cursor-pointer">
+          <button
+            type="button"
+            onClick={handleManualPlay}
+            className="px-4 py-2 rounded-xl bg-brand-marigold hover:bg-brand-marigoldDark text-white text-xs font-bold shadow-lg animate-pulse"
+          >
+            Tap to Enable Video & Audio
+          </button>
+        </div>
       )}
 
       {/* Audio-Only Degradation Fallback Screen (The Core Differentiator) */}

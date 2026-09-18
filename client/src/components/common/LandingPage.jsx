@@ -295,11 +295,11 @@ export default function LandingPage({ onNavigate }) {
             </div>
 
             {/* Network Profile Toggle Buttons */}
-            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setSimulatorMode('4g')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-center ${
                   simulatorMode === '4g' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -308,7 +308,7 @@ export default function LandingPage({ onNavigate }) {
               <button
                 type="button"
                 onClick={() => setSimulatorMode('3g')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-center ${
                   simulatorMode === '3g' ? 'bg-amber-600 text-white' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -317,7 +317,7 @@ export default function LandingPage({ onNavigate }) {
               <button
                 type="button"
                 onClick={() => setSimulatorMode('2g')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-center ${
                   simulatorMode === '2g' ? 'bg-brand-marigold text-white' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -326,7 +326,7 @@ export default function LandingPage({ onNavigate }) {
               <button
                 type="button"
                 onClick={() => setSimulatorMode('blackout')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-center ${
                   simulatorMode === 'blackout' ? 'bg-rose-700 text-white' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
