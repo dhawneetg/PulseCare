@@ -36,4 +36,16 @@ export function setupSignalingHandlers(io, socket) {
       from: socket.id
     });
   });
+
+  // Dual-channel clinical emergency text relay over Socket.io
+  socket.on('text-relay', ({ roomId, payload }) => {
+    if (roomId) {
+      socket.join(roomId);
+      socket.to(roomId).emit('text-relay', {
+        ...payload,
+        roomId,
+        from: socket.id
+      });
+    }
+  });
 }

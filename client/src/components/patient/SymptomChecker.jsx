@@ -10,22 +10,29 @@ import {
   PhoneCall, 
   ArrowRight, 
   RotateCcw,
-  Sparkles
+  Sparkles,
+  ShieldCheck,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { evaluateSymptoms, getTriageRationale } from '../../utils/triageTree.js';
+import { TRANSLATIONS } from '../../utils/translations.js';
 
 const COMMON_SYMPTOMS = [
-  { id: 'fever', label: 'Fever / High Temperature' },
-  { id: 'cough', label: 'Cough / Sore Throat' },
-  { id: 'body ache', label: 'Body Ache / Fatigue' },
-  { id: 'headache', label: 'Persistent Headache' },
-  { id: 'chest pain', label: 'Chest Pain / Pressure (Critical)' },
-  { id: 'difficulty breathing', label: 'Difficulty Breathing (Critical)' },
-  { id: 'vomiting', label: 'Vomiting / Loose Motion' },
-  { id: 'joint pain', label: 'Joint / Knee Pain' },
+  { id: 'fever', labelEn: 'Fever / High Temperature', labelHi: 'तेज़ बुखार / तपन' },
+  { id: 'cough', labelEn: 'Cough / Sore Throat', labelHi: 'खांसी / गले में खराश' },
+  { id: 'body ache', labelEn: 'Body Ache / Fatigue', labelHi: 'बदन दर्द / थकान' },
+  { id: 'headache', labelEn: 'Persistent Headache', labelHi: 'सिरदर्द / चक्कर' },
+  { id: 'chest pain', labelEn: 'Chest Pain / Pressure (Critical)', labelHi: 'छाती में दर्द / दबाव (गंभीर)' },
+  { id: 'difficulty breathing', labelEn: 'Difficulty Breathing (Critical)', labelHi: 'सांस लेने में तकलीफ (गंभीर)' },
+  { id: 'vomiting', labelEn: 'Vomiting / Loose Motion', labelHi: 'उल्टी / दस्त / निर्जलीकरण' },
+  { id: 'joint pain', labelEn: 'Joint / Knee Pain', labelHi: 'जोड़ों व घुटनों में दर्द' },
 ];
 
-export default function SymptomChecker({ onJoinQueue }) {
+export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+  const isHi = lang === 'hi';
+
   const [step, setStep] = useState(1); // 1: Patient Details, 2: Vitals & Symptoms, 3: Triage Result
   const [patientData, setPatientData] = useState({
     name: '',
@@ -40,6 +47,11 @@ export default function SymptomChecker({ onJoinQueue }) {
     symptoms: [],
     customSymptom: '',
   });
+
+  // Conditional Vitals Options for Remote/Tribal Villages without medical hardware
+  const [hasBpMonitor, setHasBpMonitor] = useState(true);
+  const [hasPulseOximeter, setHasPulseOximeter] = useState(true);
+  const [hasThermometer, setHasThermometer] = useState(true);
 
   const [triageResult, setTriageResult] = useState(null);
 
@@ -66,9 +78,17 @@ export default function SymptomChecker({ onJoinQueue }) {
   };
 
   const handleEvaluate = () => {
-    const urgency = evaluateSymptoms(patientData.vitals, patientData.symptoms);
-    const rationale = getTriageRationale(urgency, patientData.vitals, patientData.symptoms);
-    setTriageResult({ urgency, rationale });
+    // Build normalized vitals reflecting hardware availability
+    const effectiveVitals = {
+      temp: hasThermometer ? patientData.vitals.temp : 'NA',
+      bp: hasBpMonitor ? patientData.vitals.bp : 'NA',
+      pulse: hasPulseOximeter ? patientData.vitals.pulse : 'NA',
+      spo2: hasPulseOximeter ? patientData.vitals.spo2 : 'NA',
+    };
+
+    const urgency = evaluateSymptoms(effectiveVitals, patientData.symptoms);
+    const rationale = getTriageRationale(urgency, effectiveVitals, patientData.symptoms, lang);
+    setTriageResult({ urgency, rationale, effectiveVitals });
     setStep(3);
   };
 
@@ -89,11 +109,11 @@ export default function SymptomChecker({ onJoinQueue }) {
     if (onJoinQueue) {
       onJoinQueue({
         id: `p_${Date.now()}`,
-        name: patientData.name || 'Anonymous Patient',
+        name: patientData.name || (isHi ? 'अज्ञात मरीज़' : 'Anonymous Patient'),
         age: parseInt(patientData.age, 10) || 35,
-        village: patientData.village || 'Village Block',
-        vitals: patientData.vitals,
-        symptoms: patientData.symptoms.length > 0 ? patientData.symptoms : ['General Consultation'],
+        village: patientData.village || (isHi ? 'गाँव केंद्र' : 'Village Block'),
+        vitals: triageResult?.effectiveVitals || patientData.vitals,
+        symptoms: patientData.symptoms.length > 0 ? patientData.symptoms : [isHi ? 'सामान्य परामर्श' : 'General Consultation'],
         urgency: triageResult?.urgency || 'consultation',
       });
     }
@@ -107,7 +127,7 @@ export default function SymptomChecker({ onJoinQueue }) {
           <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${step >= 1 ? 'bg-brand-marigold text-white' : 'bg-neutral-200 text-neutral-600'}`}>
             1
           </span>
-          <span className="text-sm font-medium text-neutral-700">Profile</span>
+          <span className="text-sm font-medium text-neutral-700">{t.step1}</span>
         </div>
         <div className="h-0.5 flex-1 mx-3 bg-neutral-200">
           <div className={`h-full bg-brand-marigold transition-all duration-300 ${step === 1 ? 'w-0' : step === 2 ? 'w-1/2' : 'w-full'}`} />
@@ -116,7 +136,7 @@ export default function SymptomChecker({ onJoinQueue }) {
           <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${step >= 2 ? 'bg-brand-marigold text-white' : 'bg-neutral-200 text-neutral-600'}`}>
             2
           </span>
-          <span className="text-sm font-medium text-neutral-700">Symptoms</span>
+          <span className="text-sm font-medium text-neutral-700">{t.step2}</span>
         </div>
         <div className="h-0.5 flex-1 mx-3 bg-neutral-200">
           <div className={`h-full bg-brand-marigold transition-all duration-300 ${step <= 2 ? 'w-0' : 'w-full'}`} />
@@ -125,7 +145,7 @@ export default function SymptomChecker({ onJoinQueue }) {
           <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${step === 3 ? 'bg-brand-marigold text-white' : 'bg-neutral-200 text-neutral-600'}`}>
             3
           </span>
-          <span className="text-sm font-medium text-neutral-700">Triage</span>
+          <span className="text-sm font-medium text-neutral-700">{t.step3}</span>
         </div>
       </div>
 
@@ -133,23 +153,23 @@ export default function SymptomChecker({ onJoinQueue }) {
       {step === 1 && (
         <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm space-y-6">
           <div className="border-b border-neutral-100 pb-4">
-            <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">Patient Information</h2>
+            <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">{t.symptomCheckerTitle}</h2>
             <p className="text-neutral-600 text-sm mt-1">
-              Deterministic offline registration for village residents or ASHA workers.
+              {t.symptomCheckerSubtitle}
             </p>
           </div>
 
           <div className="space-y-4">
             <div>
               <label className="block text-base font-semibold text-neutral-900 mb-2">
-                Patient Full Name *
+                {t.fullName}
               </label>
               <div className="relative">
                 <input
                   type="text"
                   value={patientData.name}
                   onChange={(e) => setPatientData({ ...patientData, name: e.target.value })}
-                  placeholder="e.g. Ramesh Kumar"
+                  placeholder={isHi ? 'उदा. रमेश कुमार' : 'e.g. Ramesh Kumar'}
                   className="w-full h-14 pl-11 pr-4 rounded-xl border-2 border-neutral-200 focus:border-brand-marigold focus:outline-none text-lg text-neutral-900 font-medium"
                 />
                 <User className="w-5 h-5 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -159,27 +179,27 @@ export default function SymptomChecker({ onJoinQueue }) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-base font-semibold text-neutral-900 mb-2">
-                  Age (Years) *
+                  {t.age}
                 </label>
                 <input
                   type="number"
                   value={patientData.age}
                   onChange={(e) => setPatientData({ ...patientData, age: e.target.value })}
-                  placeholder="e.g. 45"
+                  placeholder="45"
                   className="w-full h-14 px-4 rounded-xl border-2 border-neutral-200 focus:border-brand-marigold focus:outline-none text-lg text-neutral-900 font-medium"
                 />
               </div>
 
               <div>
                 <label className="block text-base font-semibold text-neutral-900 mb-2">
-                  Village / Block *
+                  {t.village}
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={patientData.village}
                     onChange={(e) => setPatientData({ ...patientData, village: e.target.value })}
-                    placeholder="e.g. Rampur Block A"
+                    placeholder={isHi ? 'उदा. रामपुर ब्लॉक बी' : 'e.g. Rampur Block B'}
                     className="w-full h-14 pl-10 pr-3 rounded-xl border-2 border-neutral-200 focus:border-brand-marigold focus:outline-none text-base text-neutral-900 font-medium"
                   />
                   <MapPin className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -196,33 +216,69 @@ export default function SymptomChecker({ onJoinQueue }) {
                   age: '45',
                   village: 'Rampur Village Block B',
                   vitals: { temp: '99.2', bp: '120/80', pulse: '76', spo2: '98' },
-                  symptoms: ['Fever / High Temperature', 'Cough / Sore Throat'],
+                  symptoms: [isHi ? 'तेज़ बुखार / तपन' : 'Fever / High Temperature', isHi ? 'खांसी / गले में खराश' : 'Cough / Sore Throat'],
                   customSymptom: '',
                 })}
                 className="text-xs font-semibold text-brand-teal hover:underline flex items-center gap-1"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                Autofill Demo Patient (Ramesh Kumar)
+                {t.autofillDemo}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* STEP 2: Vitals & Symptoms */}
+      {/* STEP 2: Vitals & Symptoms (With Conditional Devices Option) */}
       {step === 2 && (
         <div className="space-y-6">
           {/* Vitals Card */}
           <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm space-y-4">
-            <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
-              <HeartPulse className="w-5 h-5 text-brand-marigold" />
-              <span>Current Vitals (Measured or Estimated)</span>
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-3">
+              <div>
+                <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
+                  <HeartPulse className="w-5 h-5 text-brand-marigold" />
+                  <span>{t.vitalsTitle}</span>
+                </h3>
+                <p className="text-xs text-neutral-500 mt-0.5">
+                  {t.vitalsOptionalHint}
+                </p>
+              </div>
+            </div>
+
+            {/* Device Availability Toggles */}
+            <div className="flex flex-wrap gap-3 p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setHasBpMonitor(!hasBpMonitor)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border font-semibold transition-colors ${
+                  hasBpMonitor
+                    ? 'bg-brand-teal/10 border-brand-teal text-brand-tealDark'
+                    : 'bg-white border-neutral-300 text-neutral-400 line-through'
+                }`}
+              >
+                {hasBpMonitor ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+                <span>{isHi ? 'बीपी मशीन उपलब्ध' : 'BP Monitor Available'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setHasPulseOximeter(!hasPulseOximeter)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border font-semibold transition-colors ${
+                  hasPulseOximeter
+                    ? 'bg-brand-teal/10 border-brand-teal text-brand-tealDark'
+                    : 'bg-white border-neutral-300 text-neutral-400 line-through'
+                }`}
+              >
+                {hasPulseOximeter ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+                <span>{isHi ? 'ऑक्सीमीटर उपलब्ध' : 'Pulse Oximeter Available'}</span>
+              </button>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-neutral-700 mb-1">
-                  Temperature (°F)
+                  {t.temp}
                 </label>
                 <div className="relative">
                   <input
@@ -240,50 +296,68 @@ export default function SymptomChecker({ onJoinQueue }) {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1">
-                  Blood Pressure (BP)
+                <label className="block text-sm font-semibold text-neutral-700 mb-1 flex items-center justify-between">
+                  <span>{t.bp}</span>
+                  {!hasBpMonitor && <span className="text-[10px] text-amber-600 font-bold">{isHi ? 'छोड़ा गया' : 'Skipped'}</span>}
                 </label>
                 <input
                   type="text"
-                  value={patientData.vitals.bp}
+                  disabled={!hasBpMonitor}
+                  value={hasBpMonitor ? patientData.vitals.bp : 'NA'}
                   onChange={(e) => setPatientData({
                     ...patientData,
                     vitals: { ...patientData.vitals, bp: e.target.value }
                   })}
                   placeholder="120/80"
-                  className="w-full h-12 px-3 rounded-lg border-2 border-neutral-200 focus:border-brand-marigold text-base font-semibold"
+                  className={`w-full h-12 px-3 rounded-lg border-2 text-base font-semibold ${
+                    hasBpMonitor
+                      ? 'border-neutral-200 focus:border-brand-marigold bg-white'
+                      : 'border-neutral-200 bg-neutral-100 text-neutral-400'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1">
-                  Pulse Rate (BPM)
+                <label className="block text-sm font-semibold text-neutral-700 mb-1 flex items-center justify-between">
+                  <span>{t.pulse}</span>
+                  {!hasPulseOximeter && <span className="text-[10px] text-amber-600 font-bold">{isHi ? 'छोड़ा गया' : 'Skipped'}</span>}
                 </label>
                 <input
                   type="text"
-                  value={patientData.vitals.pulse}
+                  disabled={!hasPulseOximeter}
+                  value={hasPulseOximeter ? patientData.vitals.pulse : 'NA'}
                   onChange={(e) => setPatientData({
                     ...patientData,
                     vitals: { ...patientData.vitals, pulse: e.target.value }
                   })}
                   placeholder="75"
-                  className="w-full h-12 px-3 rounded-lg border-2 border-neutral-200 focus:border-brand-marigold text-base font-semibold"
+                  className={`w-full h-12 px-3 rounded-lg border-2 text-base font-semibold ${
+                    hasPulseOximeter
+                      ? 'border-neutral-200 focus:border-brand-marigold bg-white'
+                      : 'border-neutral-200 bg-neutral-100 text-neutral-400'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1">
-                  Oxygen SpO2 (%)
+                <label className="block text-sm font-semibold text-neutral-700 mb-1 flex items-center justify-between">
+                  <span>{t.spo2}</span>
+                  {!hasPulseOximeter && <span className="text-[10px] text-amber-600 font-bold">{isHi ? 'छोड़ा गया' : 'Skipped'}</span>}
                 </label>
                 <input
                   type="text"
-                  value={patientData.vitals.spo2}
+                  disabled={!hasPulseOximeter}
+                  value={hasPulseOximeter ? patientData.vitals.spo2 : 'NA'}
                   onChange={(e) => setPatientData({
                     ...patientData,
                     vitals: { ...patientData.vitals, spo2: e.target.value }
                   })}
                   placeholder="98"
-                  className="w-full h-12 px-3 rounded-lg border-2 border-neutral-200 focus:border-brand-marigold text-base font-semibold"
+                  className={`w-full h-12 px-3 rounded-lg border-2 text-base font-semibold ${
+                    hasPulseOximeter
+                      ? 'border-neutral-200 focus:border-brand-marigold bg-white'
+                      : 'border-neutral-200 bg-neutral-100 text-neutral-400'
+                  }`}
                 />
               </div>
             </div>
@@ -292,22 +366,25 @@ export default function SymptomChecker({ onJoinQueue }) {
           {/* Symptoms Checklist */}
           <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm space-y-4">
             <h3 className="text-xl font-bold text-neutral-900">
-              Select Observed Symptoms
+              {t.observedSymptomsTitle}
             </h3>
             <p className="text-sm text-neutral-500">
-              Tap all symptoms that apply. Evaluated offline via deterministic decision rules.
+              {t.observedSymptomsSubtitle}
             </p>
 
             <div className="grid grid-cols-1 gap-2.5">
               {COMMON_SYMPTOMS.map((item) => {
-                const isSelected = patientData.symptoms.includes(item.label);
-                const isCritical = item.label.includes('(Critical)');
+                const label = isHi ? item.labelHi : item.labelEn;
+                const isSelected = patientData.symptoms.includes(label) || 
+                  patientData.symptoms.includes(item.labelEn) || 
+                  patientData.symptoms.includes(item.labelHi);
+                const isCritical = item.id === 'chest pain' || item.id === 'difficulty breathing';
 
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => toggleSymptom(item.label)}
+                    onClick={() => toggleSymptom(label)}
                     className={`h-14 px-4 rounded-xl border-2 text-left flex items-center justify-between font-semibold text-base transition-all ${
                       isSelected
                         ? isCritical
@@ -318,7 +395,7 @@ export default function SymptomChecker({ onJoinQueue }) {
                         : 'border-neutral-200 hover:border-neutral-300 text-neutral-800'
                     }`}
                   >
-                    <span>{item.label}</span>
+                    <span>{label}</span>
                     {isSelected && <CheckCircle2 className="w-5 h-5 shrink-0" />}
                   </button>
                 );
@@ -331,14 +408,14 @@ export default function SymptomChecker({ onJoinQueue }) {
                 type="text"
                 value={patientData.customSymptom}
                 onChange={(e) => setPatientData({ ...patientData, customSymptom: e.target.value })}
-                placeholder="Other specific symptom..."
+                placeholder={t.customSymptomPlaceholder}
                 className="flex-1 h-12 px-3 rounded-lg border-2 border-neutral-200 focus:border-brand-marigold text-sm font-medium"
               />
               <button
                 type="submit"
                 className="px-4 h-12 bg-neutral-100 hover:bg-neutral-200 rounded-lg text-sm font-semibold text-neutral-700 transition-colors"
               >
-                Add
+                {t.addSymptom}
               </button>
             </form>
           </div>
@@ -357,24 +434,26 @@ export default function SymptomChecker({ onJoinQueue }) {
                 </div>
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wider bg-rose-200 text-rose-900 px-2 py-0.5 rounded">
-                    Critical Emergency Tier
+                    {isHi ? 'गंभीर आपातकालीन स्तर' : 'Critical Emergency Tier'}
                   </span>
                   <h3 className="text-2xl font-black text-rose-900 mt-0.5">
-                    Immediate In-Person Care Required
+                    {triageResult.rationale.title}
                   </h3>
                 </div>
               </div>
 
               <p className="text-base text-rose-900 font-medium leading-relaxed">
-                The offline triage rule engine has detected critical red-flag indicators (critical symptoms or vital extremes). Remote telemedicine is bypassed to prevent delay.
+                {triageResult.rationale.description}
               </p>
 
               <div className="bg-white/80 p-4 rounded-xl border border-rose-200 space-y-2">
-                <div className="font-bold text-rose-950 text-sm">Action Plan:</div>
+                <div className="font-bold text-rose-950 text-sm">
+                  {isHi ? 'कार्य योजना:' : 'Action Plan:'}
+                </div>
                 <ul className="text-sm text-rose-900 space-y-1.5 list-disc list-inside">
-                  <li>Proceed immediately to the nearest Primary Health Centre (PHC) or District Hospital.</li>
-                  <li>Call National Emergency Medical Services (108 Ambulance).</li>
-                  <li>Village ASHA worker has been flagged for emergency transit assistance.</li>
+                  <li>{isHi ? 'तुरंत नजदीकी प्राथमिक स्वास्थ्य केंद्र (PHC) या जिला अस्पताल पहुंचें।' : 'Proceed immediately to the nearest Primary Health Centre (PHC) or District Hospital.'}</li>
+                  <li>{isHi ? 'राष्ट्रीय आपातकालीन एम्बुलेंस 108 पर कॉल करें।' : 'Call National Emergency Medical Services (108 Ambulance).'}</li>
+                  <li>{isHi ? 'गाँव की आशा कार्यकर्ता को आपातकालीन सहायता हेतु सूचित किया गया है।' : 'Village ASHA worker has been flagged for emergency transit assistance.'}</li>
                 </ul>
               </div>
 
@@ -384,7 +463,7 @@ export default function SymptomChecker({ onJoinQueue }) {
                   className="w-full h-16 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl px-6 flex items-center justify-center gap-2 text-xl shadow-md transition-colors"
                 >
                   <PhoneCall className="w-6 h-6" />
-                  <span>Call 108 Ambulance</span>
+                  <span>{isHi ? '108 एम्बुलेंस को कॉल करें' : 'Call 108 Ambulance'}</span>
                 </a>
               </div>
             </div>
@@ -397,10 +476,10 @@ export default function SymptomChecker({ onJoinQueue }) {
                 </div>
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
-                    Triage Evaluated: Consultation Tier
+                    {isHi ? 'ट्राइएज मूल्यांकित: परामर्श स्तर' : 'Triage Evaluated: Consultation Tier'}
                   </span>
                   <h3 className="text-2xl font-extrabold text-neutral-900 mt-0.5">
-                    Ready for Hub Doctor Consultation
+                    {triageResult.rationale.title}
                   </h3>
                 </div>
               </div>
@@ -412,21 +491,25 @@ export default function SymptomChecker({ onJoinQueue }) {
               {/* Summary Card */}
               <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-neutral-500">Patient:</span>
+                  <span className="text-neutral-500">{isHi ? 'मरीज़:' : 'Patient:'}</span>
                   <span className="font-bold text-neutral-900">{patientData.name} ({patientData.age}y)</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-neutral-500">Location:</span>
+                  <span className="text-neutral-500">{isHi ? 'स्थान:' : 'Location:'}</span>
                   <span className="font-semibold text-neutral-900">{patientData.village}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-neutral-500">Vitals:</span>
-                  <span className="font-mono text-neutral-900">
-                    {patientData.vitals.temp}°F | BP {patientData.vitals.bp} | SpO2 {patientData.vitals.spo2}%
+                  <span className="text-neutral-500">{isHi ? 'जांच (Vitals):' : 'Vitals:'}</span>
+                  <span className="font-mono text-neutral-900 text-xs sm:text-sm">
+                    {triageResult.effectiveVitals?.temp !== 'NA' ? `${triageResult.effectiveVitals.temp}°F` : 'Temp NA'} | 
+                    BP {triageResult.effectiveVitals?.bp} | 
+                    SpO2 {triageResult.effectiveVitals?.spo2 !== 'NA' ? `${triageResult.effectiveVitals.spo2}%` : 'NA'}
                   </span>
                 </div>
                 <div className="pt-1 border-t border-neutral-200">
-                  <span className="text-xs font-semibold text-neutral-500 block mb-1.5">Reported Symptoms:</span>
+                  <span className="text-xs font-semibold text-neutral-500 block mb-1.5">
+                    {isHi ? 'दर्ज लक्षण:' : 'Reported Symptoms:'}
+                  </span>
                   <div className="flex flex-wrap gap-1.5">
                     {patientData.symptoms.map((s, idx) => (
                       <span key={idx} className="text-xs px-2.5 py-1 rounded-md bg-white border border-neutral-200 font-medium text-neutral-800">
@@ -441,7 +524,7 @@ export default function SymptomChecker({ onJoinQueue }) {
         </div>
       )}
 
-      {/* STICKY BOTTOM ACTION BAR (Touch-First, minimum h-14/h-16) */}
+      {/* STICKY BOTTOM ACTION BAR */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-neutral-200 p-4 z-40">
         <div className="max-w-xl mx-auto flex items-center gap-3">
           {step > 1 && (
@@ -450,7 +533,7 @@ export default function SymptomChecker({ onJoinQueue }) {
               onClick={() => (step === 3 ? handleReset() : setStep(step - 1))}
               className="h-16 px-5 rounded-xl border-2 border-neutral-300 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-semibold flex items-center justify-center transition-colors text-base"
             >
-              {step === 3 ? <RotateCcw className="w-5 h-5" /> : 'Back'}
+              {step === 3 ? <RotateCcw className="w-5 h-5" /> : (isHi ? 'पीछे' : 'Back')}
             </button>
           )}
 
@@ -459,13 +542,13 @@ export default function SymptomChecker({ onJoinQueue }) {
               type="button"
               onClick={() => {
                 if (!patientData.name) {
-                  setPatientData({ ...patientData, name: 'Anonymous Patient' });
+                  setPatientData({ ...patientData, name: isHi ? 'अज्ञात मरीज़' : 'Anonymous Patient' });
                 }
                 setStep(2);
               }}
               className="flex-1 h-16 bg-brand-marigold hover:bg-brand-marigoldDark text-white font-bold rounded-xl px-6 flex items-center justify-center gap-2 text-lg shadow-md transition-colors"
             >
-              <span>Continue to Symptoms</span>
+              <span>{t.proceedToSymptoms}</span>
               <ArrowRight className="w-5 h-5" />
             </button>
           )}
@@ -476,7 +559,7 @@ export default function SymptomChecker({ onJoinQueue }) {
               onClick={handleEvaluate}
               className="flex-1 h-16 bg-brand-marigold hover:bg-brand-marigoldDark text-white font-bold rounded-xl px-6 flex items-center justify-center gap-2 text-lg shadow-md transition-colors"
             >
-              <span>Evaluate Triage (Offline)</span>
+              <span>{t.evaluateAndTriage}</span>
               <HeartPulse className="w-5 h-5" />
             </button>
           )}
@@ -487,7 +570,7 @@ export default function SymptomChecker({ onJoinQueue }) {
               onClick={handleProceedToQueue}
               className="flex-1 h-16 bg-brand-marigold hover:bg-brand-marigoldDark text-white font-bold rounded-xl px-6 flex items-center justify-center gap-2 text-lg shadow-md transition-colors"
             >
-              <span>Join Doctor Consultation Queue</span>
+              <span>{t.consultationAction}</span>
               <ArrowRight className="w-5 h-5" />
             </button>
           )}

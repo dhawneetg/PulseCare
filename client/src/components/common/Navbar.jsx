@@ -1,8 +1,18 @@
 import React from 'react';
-import { Activity, User, Stethoscope, Truck, Home } from 'lucide-react';
+import { Activity, User, Stethoscope, Truck, Home, Globe } from 'lucide-react';
 import NetworkBadge from './NetworkBadge.jsx';
+import { TRANSLATIONS } from '../../utils/translations.js';
 
-export default function Navbar({ currentRoute, onNavigate, networkStatus = 'stable', rtt = null }) {
+export default function Navbar({
+  currentRoute,
+  onNavigate,
+  networkStatus = 'stable',
+  rtt = null,
+  lang = 'en',
+  onToggleLang,
+}) {
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+
   return (
     <header className="bg-brand-tealDark text-white shadow-sm sticky top-0 z-50 w-full max-w-full overflow-hidden">
       <div className="max-w-7xl mx-auto px-2.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
@@ -16,19 +26,32 @@ export default function Navbar({ currentRoute, onNavigate, networkStatus = 'stab
           </div>
           <div>
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className="text-base sm:text-xl font-bold tracking-tight">PulseCare</span>
+              <span className="text-base sm:text-xl font-bold tracking-tight">{t.appTitle}</span>
               <span className="hidden md:inline-block text-[10px] uppercase px-1.5 py-0.5 rounded bg-brand-teal text-white font-medium tracking-wider">
-                Rural Telehealth
+                {t.subtitle}
               </span>
             </div>
             <p className="text-[10px] text-neutral-300 hidden lg:block">
-              Low-Bandwidth Adaptive Telemedicine
+              {t.tagline}
             </p>
           </div>
         </div>
 
         {/* Center / Right Navigation Controls */}
         <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+          {/* Language Switcher */}
+          {onToggleLang && (
+            <button
+              type="button"
+              onClick={onToggleLang}
+              className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-black/30 hover:bg-black/50 border border-white/20 text-xs font-bold text-amber-300 transition-colors shadow-2xs shrink-0"
+              title="Toggle English / हिन्दी"
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>{lang === 'hi' ? 'EN' : 'हिन्दी'}</span>
+            </button>
+          )}
+
           <nav className="flex items-center gap-0.5 sm:gap-1 bg-black/25 p-0.5 sm:p-1 rounded-lg sm:rounded-xl border border-white/10 shrink-0">
             <button
               onClick={() => onNavigate('home')}
@@ -40,7 +63,7 @@ export default function Navbar({ currentRoute, onNavigate, networkStatus = 'stab
               title="Home Overview"
             >
               <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="hidden sm:inline">Home</span>
+              <span className="hidden sm:inline">{t.navHome}</span>
             </button>
 
             <button
@@ -53,7 +76,7 @@ export default function Navbar({ currentRoute, onNavigate, networkStatus = 'stab
               title="Patient Triage & Call"
             >
               <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="hidden sm:inline">Patient</span>
+              <span className="hidden sm:inline">{t.navPatient}</span>
             </button>
 
             <button
@@ -66,7 +89,7 @@ export default function Navbar({ currentRoute, onNavigate, networkStatus = 'stab
               title="Doctor Command Hub"
             >
               <Stethoscope className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="hidden sm:inline">Doctor</span>
+              <span className="hidden sm:inline">{t.navDoctor}</span>
             </button>
 
             <button
@@ -76,10 +99,10 @@ export default function Navbar({ currentRoute, onNavigate, networkStatus = 'stab
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-neutral-200 hover:text-white hover:bg-white/10'
               }`}
-              title="ASHA Delivery Timeline"
+              title="ASHA Workload"
             >
               <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="hidden sm:inline">ASHA</span>
+              <span className="hidden sm:inline">{t.navAsha}</span>
             </button>
           </nav>
 

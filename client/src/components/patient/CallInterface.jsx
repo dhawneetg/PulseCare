@@ -27,6 +27,7 @@ export default function CallInterface({
   onSendMessage,
   isChatOpen = false,
   onToggleChat,
+  lang = 'en',
 }) {
   if (!isInCall) {
     return (
@@ -121,6 +122,7 @@ export default function CallInterface({
         isDegraded={isAudioOnly}
         isChatOpen={isChatOpen}
         onToggleChat={onToggleChat}
+        lang={lang}
       />
 
       {/* Emergency Low-Bandwidth Text Relay Drawer (Active during call / fallback) */}
@@ -131,6 +133,7 @@ export default function CallInterface({
           currentUserRole="Patient"
           isOffline={networkStatus === 'offline'}
           isAudioOnly={isAudioOnly}
+          lang={lang}
         />
       )}
     </div>

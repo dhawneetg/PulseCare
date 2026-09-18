@@ -1,5 +1,6 @@
 import React from 'react';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Gauge, MessageSquare, Radio, Wifi, WifiOff } from 'lucide-react';
+import { TRANSLATIONS } from '../../utils/translations.js';
 
 export default function CallControls({
   isAudioMuted = false,
@@ -15,7 +16,9 @@ export default function CallControls({
   isChatOpen = false,
   onToggleChat = null,
   unreadCount = 0,
+  lang = 'en',
 }) {
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
   return (
     <div className="flex flex-col gap-2.5 p-3 sm:p-4 bg-white/95 backdrop-blur rounded-2xl border border-slate-200 shadow-sm w-full">
       {/* Top Action Row: Mic, Camera, Text Chat, End Call */}
@@ -64,7 +67,7 @@ export default function CallControls({
               title="Toggle Emergency Low-Bandwidth Text Relay"
             >
               <MessageSquare className="w-4 h-4" />
-              <span className="hidden xs:inline sm:inline">Text Relay</span>
+              <span className="hidden xs:inline sm:inline">{t.toggleChat}</span>
               {unreadCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
                   {unreadCount}
@@ -81,7 +84,7 @@ export default function CallControls({
           className="h-11 px-4 sm:px-6 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-sm transition-colors shrink-0"
         >
           <PhoneOff className="w-4 h-4" />
-          <span>End Consultation</span>
+          <span>{t.endCall}</span>
         </button>
 
       </div>
@@ -90,7 +93,7 @@ export default function CallControls({
       <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-1.5 text-slate-500 font-mono text-[11px]">
           <Radio className="w-3.5 h-3.5 text-brand-teal" />
-          <span>Test Network Fallback:</span>
+          <span>{t.testNetwork}</span>
         </div>
 
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">

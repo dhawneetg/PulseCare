@@ -14,7 +14,16 @@ const WS_ENDPOINT = import.meta.env.VITE_WS_ENDPOINT || window.location.origin;
  * - signal-answer (Peer B -> Server -> Peer A)
  * - ice-candidate (Peer -> Server -> Peer)
  */
-export function useSignaling({ onQueueUpdated, onIncomingCall, onOffer, onAnswer, onIceCandidate, onCallEnded } = {}) {
+export function useSignaling({
+  onQueueUpdated,
+  onIncomingCall,
+  onOffer,
+  onAnswer,
+  onIceCandidate,
+  onCallEnded,
+  onTextRelay,
+  onPeerJoined,
+} = {}) {
   const socketRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
   const [socketId, setSocketId] = useState(null);
@@ -22,7 +31,7 @@ export function useSignaling({ onQueueUpdated, onIncomingCall, onOffer, onAnswer
   useEffect(() => {
     const socket = io(WS_ENDPOINT, {
       transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
     });
     socketRef.current = socket;
@@ -74,6 +83,18 @@ export function useSignaling({ onQueueUpdated, onIncomingCall, onOffer, onAnswer
       });
     }
 
+    if (onTextRelay) {
+      socket.on(SOCKET_EVENTS.TEXT_RELAY, (data) => {
+        onTextRelay(data);
+      });
+    }
+
+    if (onPeerJoined) {
+      socket.on(SOCKET_EVENTS.PEER_JOINED, (data) => {
+        onPeerJoined(data);
+      });
+    }
+
     return () => {
       socket.disconnect();
     };
@@ -85,6 +106,12 @@ export function useSignaling({ onQueueUpdated, onIncomingCall, onOffer, onAnswer
         ...patientPayload,
         socketId: socketRef.current.id,
       });
+    }
+  }, []);
+
+  const joinRoom = useCallback((roomId, role) => {
+    if (socketRef.current?.connected && roomId) {
+      socketRef.current.emit(SOCKET_EVENTS.JOIN_ROOM, { roomId, role });
     }
   }, []);
 
@@ -115,9 +142,16 @@ export function useSignaling({ onQueueUpdated, onIncomingCall, onOffer, onAnswer
     }
   }, []);
 
+  const sendTextRelay = useCallback((roomId, payload) => {
+    if (socketRef.current?.connected && roomId) {
+      socketRef.current.emit(SOCKET_EVENTS.TEXT_RELAY, { roomId, payload });
+    }
+  }, []);
+
   const endCallSignaling = useCallback((roomId) => {
-    if (socketRef.current?.connected) {
+    if (socketRef.current?.connected && roomId) {
       socketRef.current.emit(SOCKET_EVENTS.CALL_ENDED, { roomId });
+      socketRef.current.emit(SOCKET_EVENTS.LEAVE_ROOM, { roomId });
     }
   }, []);
 
@@ -126,10 +160,12 @@ export function useSignaling({ onQueueUpdated, onIncomingCall, onOffer, onAnswer
     isConnected,
     socketId,
     joinQueue,
+    joinRoom,
     initiateCall,
     sendOffer,
     sendAnswer,
     sendIceCandidate,
+    sendTextRelay,
     endCallSignaling,
   };
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Activity, User, Stethoscope, ShieldCheck, Wifi, Truck, HeartPulse } from 'lucide-react';
 import Navbar from './components/common/Navbar.jsx';
 import SymptomChecker from './components/patient/SymptomChecker.jsx';
@@ -25,6 +25,10 @@ export default function App() {
     return 'home';
   });
 
+  // Global Language state ('en' | 'hi')
+  const [lang, setLang] = useState('en');
+  const toggleLang = () => setLang((prev) => (prev === 'en' ? 'hi' : 'en'));
+
   // In-memory queue of patients (initialized with mock data per PRD Section 5)
   const [patients, setPatients] = useState(MOCK_PATIENTS);
   const [selectedPatient, setSelectedPatient] = useState(MOCK_PATIENTS[0]);
@@ -33,16 +37,22 @@ export default function App() {
   // Patient view state
   const [patientQueueState, setPatientQueueState] = useState(null); // null = filling questionnaire, object = in queue/call
   const [activeRoomId, setActiveRoomId] = useState(null);
+  const activeRoomIdRef = useRef(null);
 
   // Active call & WebRTC state
   const [isDoctorInCall, setIsDoctorInCall] = useState(false);
   const [isPatientInCall, setIsPatientInCall] = useState(false);
-  const [networkStatus, setNetworkStatus] = useState('stable'); // 'stable' | 'degraded'
-  const [simulatedRtt, setSimulatedRtt] = useState(120);
+  const [networkStatus, setNetworkStatus] = useState('stable'); // 'stable' | 'degraded' | 'offline'
+  const [simulatedRtt, setSimulatedRtt] = useState(42);
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoDisabled, setIsVideoDisabled] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Keep activeRoomIdRef in sync for unload listeners
+  useEffect(() => {
+    activeRoomIdRef.current = activeRoomId;
+  }, [activeRoomId]);
 
   // WebRTC Hook
   const webrtc = useWebRTC({
@@ -57,7 +67,15 @@ export default function App() {
       if (rttValue) setSimulatedRtt(rttValue);
     },
     onChatMessage: (msg) => {
-      setChatMessages((prev) => [...prev, msg]);
+      console.log('[PulseCare] WebRTC DataChannel message:', msg);
+      setChatMessages((prev) => {
+        const exists = prev.some(
+          (m) => (m.id && msg.id && m.id === msg.id) ||
+                 (m.text === msg.text && Math.abs((m.timestamp || 0) - (msg.timestamp || 0)) < 2000)
+        );
+        if (exists) return prev;
+        return [...prev, msg];
+      });
       setIsChatOpen(true);
     },
     onSendOffer: (offer, roomId) => {
@@ -85,11 +103,14 @@ export default function App() {
       console.log(`[PulseCare] Incoming call from doctor ${callerId} in room ${roomId}`);
       setActiveRoomId(roomId);
       setIsPatientInCall(true);
+      signaling.joinRoom(roomId, 'patient');
       await webrtc.startLocalMedia();
     },
     onOffer: async ({ sdp, roomId }) => {
-      console.log('[PulseCare] Received SDP offer');
+      console.log('[PulseCare] Received SDP offer in room:', roomId);
       setActiveRoomId(roomId);
+      setIsPatientInCall(true);
+      signaling.joinRoom(roomId, 'patient');
       await webrtc.handleReceiveOffer(sdp, roomId);
     },
     onAnswer: async ({ sdp }) => {
@@ -99,8 +120,28 @@ export default function App() {
     onIceCandidate: async ({ candidate }) => {
       await webrtc.handleAddIceCandidate(candidate);
     },
-    onCallEnded: () => {
-      console.log('[PulseCare] Remote peer ended the consultation');
+    onTextRelay: (payload) => {
+      console.log('[PulseCare] Received Socket.io Text Relay:', payload);
+      setChatMessages((prev) => {
+        const exists = prev.some(
+          (m) => (m.id && payload.id && m.id === payload.id) ||
+                 (m.text === payload.text && Math.abs((m.timestamp || 0) - (payload.timestamp || 0)) < 2000)
+        );
+        if (exists) return prev;
+        return [...prev, payload];
+      });
+      setIsChatOpen(true);
+    },
+    onPeerJoined: async ({ peerId, roomId, role }) => {
+      console.log(`[PulseCare] Peer ${peerId} (${role}) joined room ${roomId}`);
+      // If doctor is in call and patient joined, re-initiate offer so negotiation connects instantly
+      if (isDoctorInCall && role === 'patient') {
+        console.log('[PulseCare] Doctor re-initiating offer for newly joined patient peer');
+        await webrtc.initiateOffer(roomId);
+      }
+    },
+    onCallEnded: ({ reason } = {}) => {
+      console.log('[PulseCare] Remote peer ended consultation:', reason || 'Disconnected');
       webrtc.endCall();
       setIsDoctorInCall(false);
       setIsPatientInCall(false);
@@ -127,27 +168,38 @@ export default function App() {
     const handleOnline = () => {
       console.log('[PulseCare] Browser reports online state');
       setNetworkStatus('stable');
-      webrtc.setDegradedMode(false, 95);
-      setSimulatedRtt(95);
+      webrtc.setDegradedMode(false, 42);
+      setSimulatedRtt(42);
     };
 
     const handleOffline = () => {
       console.warn('[PulseCare] Browser reports offline state');
       setNetworkStatus('offline');
-      webrtc.setDegradedMode(true, 999);
+      webrtc.setDegradedMode(true, 999, 'offline');
       setSimulatedRtt(999);
+    };
+
+    // Broadcast call-ended immediately if user closes or reloads the tab
+    const handleBeforeUnload = () => {
+      if (activeRoomIdRef.current) {
+        signaling.endCallSignaling(activeRoomIdRef.current);
+      }
     };
 
     window.addEventListener('popstate', handlePopState);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
     };
-  }, [webrtc]);
+  }, [webrtc, signaling]);
 
   // Handle patient joining queue from offline SymptomChecker
   const handleJoinQueue = (newPatient) => {
@@ -163,8 +215,11 @@ export default function App() {
   const handleInitiateCall = async (patient) => {
     setSelectedPatient(patient);
     setIsDoctorInCall(true);
-    const roomId = `room_${patient.id}_${Date.now()}`;
+    const roomId = `room_${patient.id || 'p'}_${Date.now()}`;
     setActiveRoomId(roomId);
+
+    // Doctor joins socket room explicitly
+    signaling.joinRoom(roomId, 'doctor');
 
     // Emit call-initiate via signaling
     signaling.initiateCall(patient.socketId || patient.id, roomId);
@@ -180,19 +235,19 @@ export default function App() {
   // Multi-tier Network State Switcher: 4G -> 3G -> 2G (Audio Fallback) -> Offline (Text Relay)
   const handleSetNetworkMode = (mode) => {
     if (mode === '4g') {
-      webrtc.setDegradedMode(false, 38);
+      webrtc.setDegradedMode(false, 40, '4g');
       setNetworkStatus('stable');
-      setSimulatedRtt(38);
+      setSimulatedRtt(40);
     } else if (mode === '3g') {
-      webrtc.setDegradedMode(false, 185);
+      webrtc.setDegradedMode(false, 185, '3g');
       setNetworkStatus('stable');
       setSimulatedRtt(185);
     } else if (mode === '2g') {
-      webrtc.setDegradedMode(true, 580);
+      webrtc.setDegradedMode(true, 580, '2g');
       setNetworkStatus('degraded');
       setSimulatedRtt(580);
     } else if (mode === 'offline') {
-      webrtc.setDegradedMode(true, 999);
+      webrtc.setDegradedMode(true, 999, 'offline');
       setNetworkStatus('offline');
       setSimulatedRtt(999);
       setIsChatOpen(true);
@@ -211,12 +266,32 @@ export default function App() {
     }
   };
 
+  // Dual-channel Clinical Emergency Text Relay (WebRTC DataChannel + Socket.io fallback)
   const handleSendChatMessage = (text) => {
     const role = currentRoute === 'doctor' ? 'Doctor' : 'Patient';
-    const payload = webrtc.sendChatMessage(text, role);
-    if (payload) {
-      setChatMessages((prev) => [...prev, payload]);
+    const msgId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const payload = {
+      id: msgId,
+      type: 'CHAT_MESSAGE',
+      text,
+      sender: role,
+      timestamp: Date.now(),
+    };
+
+    // 1. Send via WebRTC DataChannel (if open)
+    try {
+      webrtc.sendChatMessage(text, role);
+    } catch (e) {
+      console.warn('[PulseCare] WebRTC DataChannel send failed, using socket fallback:', e);
     }
+
+    // 2. Dual-channel fail-safe: Send via Socket.io signaling relay to room
+    if (activeRoomId) {
+      signaling.sendTextRelay(activeRoomId, payload);
+    }
+
+    // 3. Optimistic local update
+    setChatMessages((prev) => [...prev, payload]);
   };
 
   const handleEndConsultation = () => {
@@ -245,6 +320,8 @@ export default function App() {
         onNavigate={navigateTo}
         networkStatus={networkStatus}
         rtt={simulatedRtt}
+        lang={lang}
+        onToggleLang={toggleLang}
       />
 
       {/* Main Content Area */}
@@ -279,9 +356,10 @@ export default function App() {
                 onSendMessage={handleSendChatMessage}
                 isChatOpen={isChatOpen}
                 onToggleChat={() => setIsChatOpen(!isChatOpen)}
+                lang={lang}
               />
             ) : (
-              <SymptomChecker onJoinQueue={handleJoinQueue} />
+              <SymptomChecker onJoinQueue={handleJoinQueue} lang={lang} />
             )}
           </div>
         )}
@@ -343,6 +421,7 @@ export default function App() {
                       isDegraded={networkStatus === 'degraded'}
                       isChatOpen={isChatOpen}
                       onToggleChat={() => setIsChatOpen(!isChatOpen)}
+                      lang={lang}
                     />
 
                     {/* Emergency Clinical Text Relay for Doctor */}
@@ -353,6 +432,7 @@ export default function App() {
                         currentUserRole="Doctor"
                         isOffline={networkStatus === 'offline'}
                         isAudioOnly={networkStatus === 'degraded'}
+                        lang={lang}
                       />
                     )}
                   </div>
@@ -371,11 +451,12 @@ export default function App() {
           </div>
         )}
 
-        {/* ROUTE 4: ASHA DELIVERY TIMELINE (Static Mockup per PRD Section 4.4 & Flow D) */}
+        {/* ROUTE 4: ASHA COMMUNITY WORKLOAD & LOGISTICS DASHBOARD */}
         {currentRoute === 'asha' && (
           <AshaTimeline
             prescription={activePrescriptions[0]}
             onBack={() => navigateTo('home')}
+            lang={lang}
           />
         )}
       </main>

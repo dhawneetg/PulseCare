@@ -8,6 +8,10 @@ export const SOCKET_EVENTS = {
   SIGNAL_ANSWER: 'signal-answer',
   ICE_CANDIDATE: 'ice-candidate',
   CALL_ENDED: 'call-ended',
+  TEXT_RELAY: 'text-relay',
+  JOIN_ROOM: 'join-room',
+  LEAVE_ROOM: 'leave-room',
+  PEER_JOINED: 'peer-joined',
 };
 
 export const DATA_CHANNEL_MESSAGES = {
