@@ -14,7 +14,7 @@ import { useWebRTC } from './hooks/useWebRTC.js';
 import LandingPage from './components/common/LandingPage.jsx';
 import { CommandHeaderMetrics, VillageKioskMatrix, LocalEncryptedStorageWidget } from './components/doctor/TelecommandWidgets.jsx';
 import EmergencyTextRelay from './components/common/EmergencyTextRelay.jsx';
-import { MOCK_PATIENTS, MOCK_PRESCRIPTIONS } from './utils/mockData.js';
+import { MOCK_PATIENTS, MOCK_PRESCRIPTIONS, MOCK_DOCTOR } from './utils/mockData.js';
 
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState(() => {
