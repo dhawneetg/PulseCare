@@ -14,6 +14,7 @@ export default function PrescriptionForm({ patient, onIssuePrescription }) {
 
   const [submitted, setSubmitted] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showWhatsAppQrModal, setShowWhatsAppQrModal] = useState(false);
   const [lastRxId, setLastRxId] = useState(() => `RX-${Math.floor(1000 + Math.random() * 9000)}`);
 
   const handleSubmit = (e) => {
