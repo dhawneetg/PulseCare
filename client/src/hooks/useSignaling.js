@@ -25,6 +25,7 @@ export function useSignaling({
   onPeerJoined,
   onAudioChunk,
   onVideoFrame,
+  onImagePacket,
 } = {}) {
   const socketRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
