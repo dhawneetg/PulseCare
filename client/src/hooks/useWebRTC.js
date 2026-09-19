@@ -363,6 +363,21 @@ export function useWebRTC({
   }, [onDegradationStateChange, onChatMessage]);
 
   /**
+   * Helper to flush buffered ICE candidates (defined early to prevent TDZ in handleReceiveOffer)
+   */
+  const flushIceCandidates = useCallback(async (pc) => {
+    if (!pc || !pc.remoteDescription) return;
+    while (iceCandidateQueueRef.current.length > 0) {
+      const candidate = iceCandidateQueueRef.current.shift();
+      try {
+        await pc.addIceCandidate(candidate);
+      } catch (err) {
+        console.warn('[PulseCare] Error adding buffered ICE candidate:', err);
+      }
+    }
+  }, []);
+
+  /**
    * Initialize RTCPeerConnection instance
    */
   const createPeerConnection = useCallback((roomId) => {
@@ -519,21 +534,6 @@ export function useWebRTC({
       console.error('[PulseCare] Error handling remote offer:', err);
     }
   }, [startLocalMedia, createPeerConnection, attachDataChannelListeners, onSendAnswer, flushIceCandidates]);
-
-  /**
-   * Helper to flush buffered ICE candidates
-   */
-  const flushIceCandidates = useCallback(async (pc) => {
-    if (!pc || !pc.remoteDescription) return;
-    while (iceCandidateQueueRef.current.length > 0) {
-      const candidate = iceCandidateQueueRef.current.shift();
-      try {
-        await pc.addIceCandidate(candidate);
-      } catch (err) {
-        console.warn('[PulseCare] Error adding buffered ICE candidate:', err);
-      }
-    }
-  }, []);
 
   /**
    * Peer A: Handle Answer from Peer B

@@ -54,6 +54,8 @@ export default function App() {
     activeRoomIdRef.current = activeRoomId;
   }, [activeRoomId]);
 
+  const signalingRef = useRef(null);
+
   // WebRTC Hook
   const webrtc = useWebRTC({
     onRemoteStream: (stream) => {
@@ -79,13 +81,13 @@ export default function App() {
       setIsChatOpen(true);
     },
     onSendOffer: (offer, roomId) => {
-      signaling.sendOffer(offer, roomId);
+      signalingRef.current?.sendOffer(offer, roomId);
     },
     onSendAnswer: (answer, roomId) => {
-      signaling.sendAnswer(answer, roomId);
+      signalingRef.current?.sendAnswer(answer, roomId);
     },
     onSendIceCandidate: (candidate, roomId) => {
-      signaling.sendIceCandidate(candidate, roomId);
+      signalingRef.current?.sendIceCandidate(candidate, roomId);
     },
   });
 
@@ -149,6 +151,7 @@ export default function App() {
       setPatientQueueState(null);
     },
   });
+  signalingRef.current = signaling;
 
   const navigateTo = (route) => {
     const path = route === 'home' ? '/' : `/${route}`;
