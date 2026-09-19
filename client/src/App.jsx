@@ -251,11 +251,13 @@ export default function App() {
     };
   }, [webrtc, signaling]);
 
-  // Handle patient joining queue from offline SymptomChecker
+  // Handle patient joining queue from offline SymptomChecker - launches video consultation immediately
   const handleJoinQueue = (newPatient) => {
     setPatients((prev) => [newPatient, ...prev]);
     setSelectedPatient(newPatient);
     setPatientQueueState(newPatient);
+    setIsPatientInCall(true); // Launch consultation immediately so video starts
+    webrtc.startLocalMedia(); // Immediately activate camera
 
     // Emit join-queue to signaling server
     signaling.joinQueue(newPatient);
@@ -404,6 +406,11 @@ export default function App() {
                 onEndCall={handleEndConsultation}
                 onSimulateDegradation={handleSimulateDegradation}
                 onSetNetworkMode={handleSetNetworkMode}
+                onStartCall={() => {
+                  setIsPatientInCall(true);
+                  webrtc.startLocalMedia();
+                }}
+                onStartMedia={webrtc.startLocalMedia}
                 messages={chatMessages}
                 onSendMessage={handleSendChatMessage}
                 isChatOpen={isChatOpen}
@@ -453,6 +460,7 @@ export default function App() {
                         isAudioOnly={networkStatus === 'degraded'}
                         peerName={selectedPatient?.name || 'Patient'}
                         rtt={simulatedRtt}
+                        onStartMedia={webrtc.startLocalMedia}
                       />
                       {/* Doctor Local Self Video */}
                       <VideoPlayer
@@ -460,6 +468,7 @@ export default function App() {
                         isLocal={true}
                         isAudioOnly={isVideoDisabled}
                         peerName="Dr. Ananya Sharma"
+                        onStartMedia={webrtc.startLocalMedia}
                       />
                     </div>
 

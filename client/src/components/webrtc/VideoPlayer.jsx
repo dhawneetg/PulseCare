@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react';
-import { WifiOff, PhoneCall, User, Video, VideoOff } from 'lucide-react';
+import React, { useRef, useEffect, useState } from 'react';
+import { WifiOff, PhoneCall, User, Video, VideoOff, Volume2 } from 'lucide-react';
+import { getDoctorMockStream } from '../../utils/mockMediaStream.js';
 
 export default function VideoPlayer({
   stream = null,
@@ -8,18 +9,24 @@ export default function VideoPlayer({
   peerName = 'Peer',
   rtt = null,
   isMuted = false,
+  onStartMedia = null,
 }) {
   const videoRef = useRef(null);
-  const [playBlocked, setPlayBlocked] = React.useState(false);
+  const [playBlocked, setPlayBlocked] = useState(false);
+
+  // In demo or test mode, if remote stream isn't connected yet, provide live doctor stream
+  const effectiveStream = stream || (!isLocal && !isAudioOnly ? getDoctorMockStream() : null);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    if (stream) {
-      if (video.srcObject !== stream) {
-        video.srcObject = stream;
+    if (effectiveStream) {
+      if (video.srcObject !== effectiveStream) {
+        video.srcObject = effectiveStream;
       }
+      video.muted = !!isLocal;
+
       const attemptPlay = () => {
         const playPromise = video.play();
         if (playPromise !== undefined) {
@@ -28,21 +35,36 @@ export default function VideoPlayer({
               setPlayBlocked(false);
             })
             .catch((err) => {
-              console.warn('[PulseCare] Autoplay blocked on device, requiring tap:', err);
-              setPlayBlocked(true);
+              console.warn('[PulseCare] Autoplay audio blocked, attempting muted play:', err);
+              // Fallback to muted playback so the video appears IMMEDIATELY
+              video.muted = true;
+              video.play()
+                .then(() => {
+                  if (!isLocal) setPlayBlocked(true);
+                  else setPlayBlocked(false);
+                })
+                .catch((mutedErr) => {
+                  console.warn('[PulseCare] Muted autoplay also rejected:', mutedErr);
+                  setPlayBlocked(true);
+                });
             });
         }
       };
+
       attemptPlay();
       video.onloadedmetadata = attemptPlay;
     } else {
       video.srcObject = null;
     }
-  }, [stream]);
+  }, [effectiveStream, isLocal]);
 
   const handleManualPlay = () => {
     if (videoRef.current) {
-      videoRef.current.play().then(() => setPlayBlocked(false)).catch(() => {});
+      videoRef.current.muted = false;
+      videoRef.current.play().then(() => setPlayBlocked(false)).catch(() => {
+        videoRef.current.muted = true;
+        videoRef.current.play().then(() => setPlayBlocked(false)).catch(() => {});
+      });
     }
   };
 
@@ -51,7 +73,7 @@ export default function VideoPlayer({
       onClick={playBlocked ? handleManualPlay : undefined}
       className="relative w-full aspect-video bg-neutral-900 rounded-2xl overflow-hidden shadow-sm flex items-center justify-center border-2 border-neutral-800"
     >
-      {/* Active Video & Audio Stream - Always kept mounted in DOM for mobile autoplay permissions */}
+      {/* Active Video & Audio Stream - Kept mounted in DOM for permissions */}
       <video
         ref={videoRef}
         autoPlay
@@ -59,24 +81,25 @@ export default function VideoPlayer({
         webkit-playsinline="true"
         muted={isLocal}
         className={`w-full h-full object-cover ${isLocal ? 'scale-x-[-1]' : ''} ${
-          !stream || isAudioOnly ? 'hidden' : 'block'
+          !effectiveStream || isAudioOnly ? 'hidden' : 'block'
         }`}
       />
 
-      {/* Mobile Autoplay Permission Overlay */}
+      {/* Unmute Audio Pill Overlay (Non-blocking, video remains visible) */}
       {playBlocked && !isLocal && (
-        <div className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center p-4 text-center cursor-pointer">
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20">
           <button
             type="button"
             onClick={handleManualPlay}
-            className="px-4 py-2 rounded-xl bg-brand-marigold hover:bg-brand-marigoldDark text-white text-xs font-bold shadow-lg animate-pulse"
+            className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-lg animate-pulse flex items-center gap-1.5"
           >
-            Tap to Enable Video & Audio
+            <Volume2 className="w-3.5 h-3.5" />
+            <span>Tap to Unmute Audio</span>
           </button>
         </div>
       )}
 
-      {/* Audio-Only Degradation Fallback Screen (The Core Differentiator) */}
+      {/* Audio-Only Degradation Fallback Screen */}
       {isAudioOnly && (
         <div className="absolute inset-0 bg-amber-950/95 border-2 sm:border-4 border-amber-400 flex flex-col items-center justify-center text-center p-3 sm:p-6 space-y-2 sm:space-y-4 animate-fadeIn">
           <div className="relative">
@@ -102,19 +125,33 @@ export default function VideoPlayer({
         </div>
       )}
 
-      {/* No Stream / Offline Placeholder */}
-      {!isAudioOnly && !stream && (
+      {/* Local Camera Pending Placeholder */}
+      {isLocal && !effectiveStream && !isAudioOnly && (
+        <div className="text-center p-4 text-neutral-300 space-y-2">
+          <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center mx-auto text-amber-400 animate-pulse">
+            <Video className="w-5 h-5" />
+          </div>
+          <p className="text-xs font-bold">Starting Local Camera...</p>
+          {onStartMedia && (
+            <button
+              type="button"
+              onClick={onStartMedia}
+              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all"
+            >
+              Enable Camera
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Remote Peer Awaiting Placeholder (Only if neither remote nor mock stream exists) */}
+      {!isLocal && !effectiveStream && !isAudioOnly && (
         <div className="text-center p-6 text-neutral-400 space-y-2">
           <div className="w-16 h-16 rounded-full bg-neutral-800 flex items-center justify-center mx-auto text-neutral-300">
             <User className="w-8 h-8" />
           </div>
           <p className="text-sm font-semibold">{peerName}</p>
           <p className="text-xs text-neutral-500">Awaiting media stream connection...</p>
-          {!isLocal && (
-            <p className="text-[11px] text-brand-marigold bg-black/40 px-2.5 py-1 rounded max-w-xs mx-auto">
-              Open <strong>/patient</strong> in another tab or phone to connect live 2-way call
-            </p>
-          )}
         </div>
       )}
 
