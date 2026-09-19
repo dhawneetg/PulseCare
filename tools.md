@@ -12,7 +12,7 @@ This document defines the strict development boundaries, banned patterns, error-
 
 ---
 
-## 1. Golden Directives (36-Hour Hackathon Scope)
+## 1. Directives
 
 1. **Ship the Differentiator First:** The core winner feature is the WebRTC bandwidth degradation (`getStats()` latency polling -> disabling video track -> audio fallback). Every other feature is secondary.
 2. **Deterministic Over Magical:** The symptom checker is a hardcoded JavaScript rule engine (`if/else`), NOT an ML model or external LLM API.
