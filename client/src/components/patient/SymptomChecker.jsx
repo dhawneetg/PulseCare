@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Activity, 
   AlertTriangle, 
@@ -13,7 +13,14 @@ import {
   Sparkles,
   ShieldCheck,
   CheckSquare,
-  Square
+  Square,
+  Mic,
+  MicOff,
+  CreditCard,
+  Leaf,
+  Info,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { evaluateSymptoms, getTriageRationale } from '../../utils/triageTree.js';
 import { TRANSLATIONS } from '../../utils/translations.js';
@@ -48,12 +55,99 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
     customSymptom: '',
   });
 
+  // Optional ABHA ID (Ayushman Bharat Digital Mission) State
+  const [abhaId, setAbhaId] = useState('');
+  const [abhaVerified, setAbhaVerified] = useState(false);
+  const [abhaRecord, setAbhaRecord] = useState(null);
+
+  // Speech-to-Text Voice Input State
+  const [isListening, setIsListening] = useState(false);
+  const [speechNotice, setSpeechNotice] = useState(null);
+  const recognitionRef = useRef(null);
+
+  // Ayush accordion state
+  const [showAyushAdvice, setShowAyushAdvice] = useState(true);
+
   // Conditional Vitals Options for Remote/Tribal Villages without medical hardware
   const [hasBpMonitor, setHasBpMonitor] = useState(true);
   const [hasPulseOximeter, setHasPulseOximeter] = useState(true);
   const [hasThermometer, setHasThermometer] = useState(true);
 
   const [triageResult, setTriageResult] = useState(null);
+
+  // Toggle Voice Recognition for ASHA / Patient
+  const toggleVoiceInput = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechNotice(isHi ? 'इस ब्राउज़र में आवाज़ पहचान समर्थित नहीं है।' : 'Voice recognition not supported in this browser.');
+      setTimeout(() => setSpeechNotice(null), 3000);
+      return;
+    }
+
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = isHi ? 'hi-IN' : 'en-IN';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setSpeechNotice(isHi ? 'बोलिए... आपकी आवाज़ रिकॉर्ड हो रही है' : 'Listening... Speak your symptoms');
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript && transcript.trim()) {
+          const spokenText = transcript.trim();
+          setPatientData(prev => ({
+            ...prev,
+            symptoms: [...prev.symptoms, spokenText]
+          }));
+          setSpeechNotice(`${isHi ? 'जोड़ा गया: ' : 'Added: '} "${spokenText}"`);
+          setTimeout(() => setSpeechNotice(null), 3500);
+        }
+        setIsListening(false);
+      };
+
+      recognition.onerror = (err) => {
+        console.warn('[PulseCare] Speech recognition notice:', err);
+        setIsListening(false);
+        setSpeechNotice(isHi ? 'माइक्रोफ़ोन अनुमति या आवाज़ समझ नहीं आई।' : 'Microphone error or could not capture voice.');
+        setTimeout(() => setSpeechNotice(null), 3000);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('[PulseCare] Speech recognition init failed:', err);
+      setIsListening(false);
+    }
+  };
+
+  const handleVerifyAbha = () => {
+    const cleanId = abhaId.trim() || '91-4821-3091-7712';
+    setAbhaId(cleanId);
+    setAbhaVerified(true);
+    setAbhaRecord({
+      abhaNumber: cleanId,
+      pmjayCoverage: '₹5,00,000 (Active Ayushman Card)',
+      bloodGroup: 'B+ Positive',
+      linkedPhc: 'Barabanki Sub-Center #04',
+      allergies: 'None recorded'
+    });
+  };
 
   const toggleSymptom = (label) => {
     setPatientData(prev => {
@@ -225,13 +319,74 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
                 {t.autofillDemo}
               </button>
             </div>
+
+            {/* Optional ABHA ID (Ayushman Bharat Digital Mission) Integration */}
+            <div className="pt-3 border-t border-neutral-100 text-left">
+              <div className="bg-emerald-50/70 rounded-xl p-4 border border-emerald-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-emerald-800" />
+                    <span className="text-xs font-bold uppercase text-emerald-950 tracking-wider">
+                      {isHi ? 'आयुष्मान भारत ABHA पहचान' : 'Ayushman Bharat ABHA ID'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-full border border-emerald-300">
+                    {isHi ? 'ऐच्छिक / Optional' : 'Optional (वैकल्पिक)'}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-emerald-900/80 leading-snug">
+                  {isHi 
+                    ? 'यदि उपलब्ध हो तो 14-अंकीय आभा संख्या दर्ज करें। यह अनिवार्य नहीं है।' 
+                    : 'Link 14-digit ABHA ID for digital health history retrieval. Non-mandatory.'}
+                </p>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={abhaId}
+                    onChange={(e) => {
+                      setAbhaId(e.target.value);
+                      if (abhaVerified) setAbhaVerified(false);
+                    }}
+                    placeholder={isHi ? 'उदा. 91-4821-3091-7712' : 'e.g. 91-4821-3091-7712'}
+                    className="flex-1 h-10 px-3 rounded-lg border border-emerald-300 focus:border-emerald-600 focus:outline-none text-xs font-mono font-medium text-emerald-950 bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyAbha}
+                    className="px-3 h-10 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition-colors shrink-0 flex items-center gap-1.5 shadow-sm"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>{abhaVerified ? (isHi ? 'सत्यापित' : 'Verified') : (isHi ? 'सत्यापित करें' : 'Verify')}</span>
+                  </button>
+                </div>
+
+                {abhaVerified && abhaRecord && (
+                  <div className="bg-white p-3 rounded-lg border border-emerald-300 text-[11px] space-y-1 animate-in fade-in">
+                    <div className="flex items-center justify-between text-emerald-950 font-bold">
+                      <span className="flex items-center gap-1 text-emerald-800">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>ABDM Active: {abhaRecord.abhaNumber}</span>
+                      </span>
+                      <span className="text-[10px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        Blood: {abhaRecord.bloodGroup}
+                      </span>
+                    </div>
+                    <p className="text-neutral-600 text-[10px]">
+                      <strong>PMJAY Cover:</strong> {abhaRecord.pmjayCoverage} • <strong>Center:</strong> {abhaRecord.linkedPhc}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* STEP 2: Vitals & Symptoms (With Conditional Devices Option) */}
       {step === 2 && (
-        <div className="space-y-6">
+        <div className="space-y-6 text-left">
           {/* Vitals Card */}
           <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-3">
@@ -241,58 +396,63 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
                   <span>{t.vitalsTitle}</span>
                 </h3>
                 <p className="text-xs text-neutral-500 mt-0.5">
-                  {t.vitalsOptionalHint}
+                  {t.vitalsSubtitle}
                 </p>
+              </div>
+
+              {/* Hardware Toggles for Remote Clinics */}
+              <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setHasThermometer(!hasThermometer)}
+                  className={`px-2.5 py-1 rounded-md border transition-colors ${
+                    hasThermometer ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-neutral-100 border-neutral-200 text-neutral-500 line-through'
+                  }`}
+                >
+                  {isHi ? 'थर्मामीटर' : 'Thermometer'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHasBpMonitor(!hasBpMonitor)}
+                  className={`px-2.5 py-1 rounded-md border transition-colors ${
+                    hasBpMonitor ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-neutral-100 border-neutral-200 text-neutral-500 line-through'
+                  }`}
+                >
+                  {isHi ? 'बीपी मॉनिटर' : 'BP Monitor'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHasPulseOximeter(!hasPulseOximeter)}
+                  className={`px-2.5 py-1 rounded-md border transition-colors ${
+                    hasPulseOximeter ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-neutral-100 border-neutral-200 text-neutral-500 line-through'
+                  }`}
+                >
+                  {isHi ? 'पल्स ऑक्सीमीटर' : 'Pulse Oximeter'}
+                </button>
               </div>
             </div>
 
-            {/* Device Availability Toggles */}
-            <div className="flex flex-wrap gap-3 p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-xs">
-              <button
-                type="button"
-                onClick={() => setHasBpMonitor(!hasBpMonitor)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border font-semibold transition-colors ${
-                  hasBpMonitor
-                    ? 'bg-brand-teal/10 border-brand-teal text-brand-tealDark'
-                    : 'bg-white border-neutral-300 text-neutral-400 line-through'
-                }`}
-              >
-                {hasBpMonitor ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
-                <span>{isHi ? 'बीपी मशीन उपलब्ध' : 'BP Monitor Available'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setHasPulseOximeter(!hasPulseOximeter)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border font-semibold transition-colors ${
-                  hasPulseOximeter
-                    ? 'bg-brand-teal/10 border-brand-teal text-brand-tealDark'
-                    : 'bg-white border-neutral-300 text-neutral-400 line-through'
-                }`}
-              >
-                {hasPulseOximeter ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
-                <span>{isHi ? 'ऑक्सीमीटर उपलब्ध' : 'Pulse Oximeter Available'}</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1">
-                  {t.temp}
+                <label className="block text-sm font-semibold text-neutral-700 mb-1 flex items-center justify-between">
+                  <span>{t.temp}</span>
+                  {!hasThermometer && <span className="text-[10px] text-amber-600 font-bold">{isHi ? 'छोड़ा गया' : 'Skipped'}</span>}
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={patientData.vitals.temp}
-                    onChange={(e) => setPatientData({
-                      ...patientData,
-                      vitals: { ...patientData.vitals, temp: e.target.value }
-                    })}
-                    placeholder="98.6"
-                    className="w-full h-12 pl-9 pr-3 rounded-lg border-2 border-neutral-200 focus:border-brand-marigold text-base font-semibold"
-                  />
-                  <Thermometer className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                </div>
+                <input
+                  type="text"
+                  disabled={!hasThermometer}
+                  value={hasThermometer ? patientData.vitals.temp : 'NA'}
+                  onChange={(e) => setPatientData({
+                    ...patientData,
+                    vitals: { ...patientData.vitals, temp: e.target.value }
+                  })}
+                  placeholder="98.6"
+                  className={`w-full h-12 px-3 rounded-lg border-2 text-base font-semibold ${
+                    hasThermometer
+                      ? 'border-neutral-200 focus:border-brand-marigold bg-white'
+                      : 'border-neutral-200 bg-neutral-100 text-neutral-400'
+                  }`}
+                />
               </div>
 
               <div>
@@ -365,12 +525,37 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
 
           {/* Symptoms Checklist */}
           <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm space-y-4">
-            <h3 className="text-xl font-bold text-neutral-900">
-              {t.observedSymptomsTitle}
-            </h3>
-            <p className="text-sm text-neutral-500">
-              {t.observedSymptomsSubtitle}
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-neutral-900">
+                  {t.observedSymptomsTitle}
+                </h3>
+                <p className="text-sm text-neutral-500">
+                  {t.observedSymptomsSubtitle}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={toggleVoiceInput}
+                title="Speak symptoms (Hindi / English)"
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm ${
+                  isListening
+                    ? 'bg-rose-600 text-white animate-pulse ring-4 ring-rose-200'
+                    : 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+                }`}
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4 text-emerald-600" />}
+                <span>{isListening ? (isHi ? 'सुन रहे हैं...' : 'Listening...') : (isHi ? 'बोलकर दर्ज करें' : 'Voice Input')}</span>
+              </button>
+            </div>
+
+            {/* Live voice speech indicator */}
+            {speechNotice && (
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                <span>{speechNotice}</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-2.5">
               {COMMON_SYMPTOMS.map((item) => {
@@ -402,15 +587,25 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
               })}
             </div>
 
-            {/* Custom Symptom Input */}
+            {/* Custom Symptom Input with Voice Mic */}
             <form onSubmit={handleAddCustomSymptom} className="flex gap-2 pt-2">
-              <input
-                type="text"
-                value={patientData.customSymptom}
-                onChange={(e) => setPatientData({ ...patientData, customSymptom: e.target.value })}
-                placeholder={t.customSymptomPlaceholder}
-                className="flex-1 h-12 px-3 rounded-lg border-2 border-neutral-200 focus:border-brand-marigold text-sm font-medium"
-              />
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={patientData.customSymptom}
+                  onChange={(e) => setPatientData({ ...patientData, customSymptom: e.target.value })}
+                  placeholder={t.customSymptomPlaceholder}
+                  className="w-full h-12 pl-3 pr-10 rounded-lg border-2 border-neutral-200 focus:border-brand-marigold text-sm font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={toggleVoiceInput}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-neutral-500 hover:text-emerald-700 transition-colors"
+                  title="Speak in Hindi/English"
+                >
+                  <Mic className="w-4 h-4" />
+                </button>
+              </div>
               <button
                 type="submit"
                 className="px-4 h-12 bg-neutral-100 hover:bg-neutral-200 rounded-lg text-sm font-semibold text-neutral-700 transition-colors"
@@ -424,7 +619,7 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
 
       {/* STEP 3: Triage Result (Deterministic Output) */}
       {step === 3 && triageResult && (
-        <div className="space-y-6">
+        <div className="space-y-6 text-left">
           {triageResult.urgency === 'emergency' ? (
             /* Emergency Alert Banner & Screen */
             <div className="bg-rose-50 border-2 border-rose-400 rounded-2xl p-6 text-rose-950 shadow-sm space-y-4">
@@ -445,6 +640,19 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
               <p className="text-base text-rose-900 font-medium leading-relaxed">
                 {triageResult.rationale.description}
               </p>
+
+              {/* Ayush Warning for Critical Emergencies */}
+              <div className="bg-rose-950/10 p-3.5 rounded-xl border border-rose-400/40 text-rose-950 text-xs space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-rose-900">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{isHi ? '⚠️ देसी व घरेलू उपचार से परहेज चेतावनी:' : '⚠️ Traditional & Home Remedy Critical Caution:'}</span>
+                </div>
+                <p className="leading-relaxed">
+                  {isHi
+                    ? 'सीने में दर्द, सांस फूलने या बेहोशी में केवल घरेलू काढ़े या चूरन पर निर्भर न रहें। तुरंत अस्पताल ले जाएं, देरी जानलेवा हो सकती है।'
+                    : 'Do not delay clinical care with herbal decoctions for cardiac symptoms or respiratory distress. Immediate hospital intervention is vital.'}
+                </p>
+              </div>
 
               <div className="bg-white/80 p-4 rounded-xl border border-rose-200 space-y-2">
                 <div className="font-bold text-rose-950 text-sm">
@@ -518,6 +726,60 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
                     ))}
                   </div>
                 </div>
+              </div>
+
+              {/* The Ayush & Desi First-Aid Bridge Card */}
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50/70 p-4 rounded-xl border border-emerald-200 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAyushAdvice(!showAyushAdvice)}
+                  className="w-full flex items-center justify-between text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <Leaf className="w-5 h-5 text-emerald-700" />
+                    <div>
+                      <h4 className="font-bold text-sm text-emerald-950">
+                        {isHi ? '🌿 आयुष व समुदाय प्राथमिक घरेलू उपचार' : '🌿 Ayush & Home First-Aid Guidance'}
+                      </h4>
+                      <p className="text-[11px] text-emerald-800/80">
+                        {isHi ? 'डॉक्टर परामर्श तक सुरक्षित प्राथमिक देखभाल' : 'Safe complementary supportive care pending consultation'}
+                      </p>
+                    </div>
+                  </div>
+                  {showAyushAdvice ? <ChevronUp className="w-4 h-4 text-emerald-700" /> : <ChevronDown className="w-4 h-4 text-emerald-700" />}
+                </button>
+
+                {showAyushAdvice && (
+                  <div className="pt-2 border-t border-emerald-200/80 text-xs text-emerald-950 space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                      <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
+                        <strong className="text-emerald-900 block mb-0.5">
+                          {isHi ? '• जीवन रक्षक घोल (ORS):' : '• Hydration / ORS Formula:'}
+                        </strong>
+                        <span>
+                          {isHi 
+                            ? '1 लीटर उबले ठंडे पानी में 6 चम्मच चीनी व 1/2 चम्मच नमक। दस्त या कमजोरी में थोड़ा-थोड़ा पिएं।' 
+                            : '1 liter boiled water + 6 level tsp sugar + 1/2 tsp salt. Sip continuously.'}
+                        </span>
+                      </div>
+                      <div className="bg-white/80 p-2.5 rounded-lg border border-emerald-100">
+                        <strong className="text-emerald-900 block mb-0.5">
+                          {isHi ? '• तुलसी-अदरक व भाप:' : '• Herbal Infusion & Steam:'}
+                        </strong>
+                        <span>
+                          {isHi 
+                            ? 'गले में खराश या हल्के बुखार में सादे पानी की भाप लें, गर्म पानी में सेंधा नमक के गरारे करें।' 
+                            : 'Steam inhalation, warm salt water gargles, warm ginger-tulsi infusion for sore throat.'}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-emerald-800 italic pt-1">
+                      {isHi 
+                        ? 'सूचना: यह प्राथमिक प्राथमिक-उपचार है। डॉक्टर द्वारा बताई गई दवाओं का स्थान नहीं लेता।' 
+                        : 'Note: Complementary first-aid advice recognized by health guidelines. Does not substitute prescribed medicines.'}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}

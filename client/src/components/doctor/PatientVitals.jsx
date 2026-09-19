@@ -8,11 +8,12 @@ import {
   Gauge, 
   CheckCircle2, 
   AlertTriangle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Ambulance
 } from 'lucide-react';
 import { getTriageRationale } from '../../utils/triageTree.js';
 
-export default function PatientVitals({ patient }) {
+export default function PatientVitals({ patient, onDispatch108 }) {
   if (!patient) {
     return (
       <div className="bg-white rounded-2xl p-8 border border-neutral-200 shadow-sm text-center text-neutral-500">
@@ -29,7 +30,28 @@ export default function PatientVitals({ patient }) {
   const isEmergency = patient.urgency === 'emergency';
 
   return (
-    <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm space-y-6">
+    <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm space-y-6 text-left">
+      {/* Critical Red Emergency Quick Dispatch Banner */}
+      {isEmergency && (
+        <div className="bg-rose-50 border border-rose-300 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-950 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-rose-900">Critical Red Triage Flag</p>
+              <p className="text-xs text-rose-800 font-medium">Patient condition requires immediate Advanced Life Support (ALS) transport to District ICU.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onDispatch108}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-rose-900/30 shrink-0 transition-all active:scale-95"
+          >
+            <Ambulance className="w-4 h-4" />
+            <span>Dispatch 108 EMS</span>
+          </button>
+        </div>
+      )}
+
       {/* Patient Header Summary */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-4">
         <div>

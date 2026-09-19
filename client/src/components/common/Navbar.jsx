@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, User, Stethoscope, Truck, Home, Globe } from 'lucide-react';
+import { Activity, User, Stethoscope, Truck, Home, Globe, Smartphone } from 'lucide-react';
 import NetworkBadge from './NetworkBadge.jsx';
 import { TRANSLATIONS } from '../../utils/translations.js';
 
@@ -10,6 +10,7 @@ export default function Navbar({
   rtt = null,
   lang = 'en',
   onToggleLang,
+  onOpenSmsUssd,
 }) {
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
 
@@ -39,6 +40,19 @@ export default function Navbar({
 
         {/* Center / Right Navigation Controls */}
         <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+          {/* Offline SMS/USSD Fallback Trigger */}
+          {onOpenSmsUssd && (
+            <button
+              type="button"
+              onClick={onOpenSmsUssd}
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-xs font-bold text-emerald-300 transition-colors shrink-0"
+              title="Test Offline GSM USSD & SMS Gateway"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>{lang === 'hi' ? 'ऑफ़लाइन USSD/SMS' : 'Offline USSD/SMS'}</span>
+            </button>
+          )}
+
           {/* Language Switcher */}
           {onToggleLang && (
             <button

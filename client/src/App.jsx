@@ -14,6 +14,10 @@ import { useWebRTC } from './hooks/useWebRTC.js';
 import LandingPage from './components/common/LandingPage.jsx';
 import { CommandHeaderMetrics, VillageKioskMatrix, LocalEncryptedStorageWidget } from './components/doctor/TelecommandWidgets.jsx';
 import EmergencyTextRelay from './components/common/EmergencyTextRelay.jsx';
+import IncomingCallModal from './components/common/IncomingCallModal.jsx';
+import AmbulanceDispatchModal from './components/doctor/AmbulanceDispatchModal.jsx';
+import SmsUssdGatewayModal from './components/common/SmsUssdGatewayModal.jsx';
+import { playIncomingRingtone, stopIncomingRingtone } from './utils/audioChime.js';
 import { MOCK_PATIENTS, MOCK_PRESCRIPTIONS, MOCK_DOCTOR } from './utils/mockData.js';
 
 export default function App() {
@@ -42,12 +46,15 @@ export default function App() {
   // Active call & WebRTC state
   const [isDoctorInCall, setIsDoctorInCall] = useState(false);
   const [isPatientInCall, setIsPatientInCall] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(null);
   const [networkStatus, setNetworkStatus] = useState('stable'); // 'stable' | 'degraded' | 'offline'
   const [simulatedRtt, setSimulatedRtt] = useState(42);
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoDisabled, setIsVideoDisabled] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [showSmsUssdModal, setShowSmsUssdModal] = useState(false);
 
   // Keep activeRoomIdRef in sync for unload listeners
   useEffect(() => {
@@ -80,11 +87,11 @@ export default function App() {
       });
       setIsChatOpen(true);
     },
-    onSendOffer: (offer, roomId) => {
-      signalingRef.current?.sendOffer(offer, roomId);
+    onSendOffer: (sdp, roomId) => {
+      signalingRef.current?.sendOffer(sdp, roomId);
     },
-    onSendAnswer: (answer, roomId) => {
-      signalingRef.current?.sendAnswer(answer, roomId);
+    onSendAnswer: (sdp, roomId) => {
+      signalingRef.current?.sendAnswer(sdp, roomId);
     },
     onSendIceCandidate: (candidate, roomId) => {
       signalingRef.current?.sendIceCandidate(candidate, roomId);
@@ -104,16 +111,28 @@ export default function App() {
     onIncomingCall: async ({ callerId, roomId }) => {
       console.log(`[PulseCare] Incoming call from doctor ${callerId} in room ${roomId}`);
       setActiveRoomId(roomId);
-      setIsPatientInCall(true);
-      signaling.joinRoom(roomId, 'patient');
-      await webrtc.startLocalMedia();
+      setIncomingCall({
+        roomId,
+        callerId,
+        doctorName: 'Dr. Ananya Sharma (District Tele-Hub 3)',
+      });
+      playIncomingRingtone();
     },
     onOffer: async ({ sdp, roomId }) => {
       console.log('[PulseCare] Received SDP offer in room:', roomId);
       setActiveRoomId(roomId);
-      setIsPatientInCall(true);
-      signaling.joinRoom(roomId, 'patient');
-      await webrtc.handleReceiveOffer(sdp, roomId);
+      // If patient is not yet actively in a call, prompt incoming consultation modal
+      if (!isDoctorInCall && !isPatientInCall) {
+        setIncomingCall({
+          roomId,
+          sdp,
+          doctorName: 'Dr. Ananya Sharma (District Tele-Hub 3)',
+        });
+        playIncomingRingtone();
+      } else {
+        // Active renegotiation
+        await webrtc.handleReceiveOffer(sdp, roomId);
+      }
     },
     onAnswer: async ({ sdp }) => {
       console.log('[PulseCare] Received SDP answer');
@@ -144,6 +163,8 @@ export default function App() {
     },
     onCallEnded: ({ reason } = {}) => {
       console.log('[PulseCare] Remote peer ended consultation:', reason || 'Disconnected');
+      stopIncomingRingtone();
+      setIncomingCall(null);
       webrtc.endCall();
       setIsDoctorInCall(false);
       setIsPatientInCall(false);
@@ -152,6 +173,29 @@ export default function App() {
     },
   });
   signalingRef.current = signaling;
+
+  const handleAcceptIncomingCall = async () => {
+    stopIncomingRingtone();
+    const callData = incomingCall;
+    setIncomingCall(null);
+    if (!callData) return;
+
+    setIsPatientInCall(true);
+    signaling.joinRoom(callData.roomId, 'patient');
+    if (callData.sdp) {
+      await webrtc.handleReceiveOffer(callData.sdp, callData.roomId);
+    } else {
+      await webrtc.startLocalMedia();
+    }
+  };
+
+  const handleDeclineIncomingCall = () => {
+    stopIncomingRingtone();
+    if (incomingCall?.roomId) {
+      signaling.sendCallEnded(incomingCall.roomId, 'Patient declined consultation');
+    }
+    setIncomingCall(null);
+  };
 
   const navigateTo = (route) => {
     const path = route === 'home' ? '/' : `/${route}`;
@@ -325,6 +369,7 @@ export default function App() {
         rtt={simulatedRtt}
         lang={lang}
         onToggleLang={toggleLang}
+        onOpenSmsUssd={() => setShowSmsUssdModal(true)}
       />
 
       {/* Main Content Area */}
@@ -371,7 +416,10 @@ export default function App() {
         {currentRoute === 'doctor' && (
           <div className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 space-y-6">
             {/* Top Telecommand Header Bar */}
-            <CommandHeaderMetrics queueCount={patients.length} />
+            <CommandHeaderMetrics 
+              queueCount={patients.length} 
+              onDispatch108={() => setShowDispatchModal(true)}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 min-h-[calc(100vh-8rem)]">
               {/* Left Sidebar: Patient Queue + Kiosk Telemetry + Local Storage */}
@@ -442,7 +490,10 @@ export default function App() {
                 )}
 
                 {/* Patient Clinical Vitals Summary */}
-                <PatientVitals patient={selectedPatient} />
+                <PatientVitals 
+                  patient={selectedPatient} 
+                  onDispatch108={() => setShowDispatchModal(true)}
+                />
 
                 {/* Prescription & ASHA Dispatch Form */}
                 <PrescriptionForm
@@ -463,6 +514,29 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Global Incoming Doctor Consultation Banner & Ringtone Modal */}
+      <IncomingCallModal
+        incomingCall={incomingCall}
+        onAccept={handleAcceptIncomingCall}
+        onDecline={handleDeclineIncomingCall}
+        lang={lang}
+      />
+
+      {/* 108 Emergency Ambulance Dispatch Modal */}
+      <AmbulanceDispatchModal
+        isOpen={showDispatchModal}
+        onClose={() => setShowDispatchModal(false)}
+        patient={selectedPatient}
+        lang={lang}
+      />
+
+      {/* Offline SMS and USSD (*144#) Fallback Gateway Modal */}
+      <SmsUssdGatewayModal
+        isOpen={showSmsUssdModal}
+        onClose={() => setShowSmsUssdModal(false)}
+        lang={lang}
+      />
     </div>
   );
 }

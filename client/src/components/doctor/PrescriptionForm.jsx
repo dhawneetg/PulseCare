@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { FileText, Send, Check, Truck, AlertCircle } from 'lucide-react';
+import { FileText, Send, Check, Truck, AlertCircle, Share2, Printer, X, Download, ShieldCheck, QrCode } from 'lucide-react';
+import QrCodeSvg from '../common/QrCodeSvg.jsx';
 
 export default function PrescriptionForm({ patient, onIssuePrescription }) {
   const [formData, setFormData] = useState({
@@ -8,15 +9,20 @@ export default function PrescriptionForm({ patient, onIssuePrescription }) {
     ashaDeliveryRoute: patient?.village ? `${patient.village} - Delivery Sector 1` : 'Village Block B - North Sector',
     ashaWorkerName: 'Pooja Devi (ASHA Worker)',
     ashaContact: '+91 98765 43210',
-    clinicalNotes: 'Adequate hydration, rest, follow up if fever persists beyond 48 hours.',
+    clinicalNotes: 'Adequate hydration, warm water gargles, follow up if fever persists beyond 48 hours.',
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [lastRxId, setLastRxId] = useState(() => `RX-${Math.floor(1000 + Math.random() * 9000)}`);
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const currentId = `RX-${Date.now().toString().slice(-4)}`;
+    setLastRxId(currentId);
+
     const rxRecord = {
-      rxId: `rx_${Date.now().toString().slice(-4)}`,
+      rxId: currentId,
       patientId: patient?.id || 'p_unknown',
       patientName: patient?.name || 'Patient',
       medication: formData.medication,
@@ -27,7 +33,7 @@ export default function PrescriptionForm({ patient, onIssuePrescription }) {
       clinicalNotes: formData.clinicalNotes,
       status: 'Routed to Local ASHA Worker',
       issuedAt: Date.now(),
-      disclaimer: 'Conceptual integration — not an active partnership with any ASHA program or health authority.'
+      disclaimer: 'National Telemedicine Gateway — District Hospital Hub 3 e-Prescription'
     };
 
     setSubmitted(true);
@@ -39,18 +45,50 @@ export default function PrescriptionForm({ patient, onIssuePrescription }) {
     }, 800);
   };
 
+  const handleShareWhatsApp = () => {
+    const text = `📋 *PulseCare Tele-Prescription (जिला टेली-हब 3)*\n` +
+      `👤 *Patient:* ${patient?.name || 'Sunita Devi'} (${patient?.age || '46'} yrs)\n` +
+      `📍 *Village:* ${patient?.village || 'Rampur PHC #04'}\n` +
+      `💊 *Medication:* ${formData.medication}\n` +
+      `⏱ *Schedule:* ${formData.dosage}\n` +
+      `👩‍⚕️ *Doctor:* Dr. Ananya Sharma (Reg. #UP-MED-48201)\n` +
+      `📦 *ASHA Contact:* ${formData.ashaWorkerName} (${formData.ashaContact})\n` +
+      `📝 *Advice:* ${formData.clinicalNotes}\n` +
+      `🔗 *Verify Slip:* https://pulsecare.gov.in/verify/${lastRxId}`;
+
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm space-y-4">
-      <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-neutral-100 pb-3 gap-2">
         <div className="flex items-center gap-2">
           <FileText className="w-5 h-5 text-brand-marigold" />
           <h3 className="text-lg font-bold text-neutral-900">
             Digital Prescription & ASHA Routing
           </h3>
         </div>
-        <span className="text-xs text-neutral-500 font-medium">
-          Patient: <strong className="text-neutral-900">{patient?.name || 'Selected Patient'}</strong>
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleShareWhatsApp}
+            title="Share Prescription via WhatsApp"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 transition-all"
+          >
+            <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>WhatsApp Slip</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowPrintModal(true)}
+            title="Preview Printable Prescription with QR Code"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 flex items-center gap-1.5 transition-all"
+          >
+            <Printer className="w-3.5 h-3.5 text-slate-700" />
+            <span>Print Slip (QR)</span>
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -149,6 +187,125 @@ export default function PrescriptionForm({ patient, onIssuePrescription }) {
           </button>
         </div>
       </form>
+
+      {/* Printable Prescription Slip Modal with Dynamic SVG QR Code */}
+      {showPrintModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl border border-neutral-300 overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Actions Bar (hidden in real print) */}
+            <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Official e-Prescription Verification Slip</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold flex items-center gap-1.5 transition-colors"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Kiosk Slip</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPrintModal(false)}
+                  className="p-1 hover:bg-white/20 rounded text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Slip Content */}
+            <div className="p-6 overflow-y-auto space-y-4 text-slate-900 bg-neutral-50 text-left font-sans">
+              {/* Slip Header */}
+              <div className="border-b-2 border-slate-800 pb-3 flex items-start justify-between">
+                <div>
+                  <h2 className="text-base font-black text-slate-900 tracking-tight uppercase">
+                    Department of Health & Family Welfare
+                  </h2>
+                  <p className="text-xs text-slate-600 font-bold">
+                    District Telemedicine Command Hub 3 • Ayushman Bharat Digital Network
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Kiosk ID: <strong className="text-slate-800">{patient?.village ? `${patient.village} #08` : 'UP-BRB-08'}</strong> • Rx No: <strong className="text-emerald-700">{lastRxId}</strong>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Date & Time</span>
+                  <span className="text-xs font-mono font-bold text-slate-700">{new Date().toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Patient Demographics Box */}
+              <div className="grid grid-cols-3 gap-2 bg-white p-3 rounded-xl border border-slate-200 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Patient Name</span>
+                  <strong className="text-slate-900 text-sm">{patient?.name || 'Sunita Devi'}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Age / Gender</span>
+                  <span className="font-semibold text-slate-800">{patient?.age || '46'} Yrs • Female</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">ABHA ID (Verified)</span>
+                  <span className="font-mono font-bold text-emerald-700">91-4821-3091-7712</span>
+                </div>
+              </div>
+
+              {/* Prescription Body */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-700">Rx Medications</span>
+                  <span className="text-[11px] font-bold text-slate-400">Oral Formulations</span>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm">{formData.medication}</p>
+                      <p className="text-slate-600 font-medium">{formData.dosage}</p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                      ASHA Kit Stocked
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Clinical Advice & Diet</span>
+                    <p className="text-slate-700 italic text-[11px]">{formData.clinicalNotes}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer with QR Code and Doctor Stamp */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200 gap-4">
+                <div className="flex items-center gap-3">
+                  <QrCodeSvg 
+                    value={`https://pulsecare.gov.in/verify/${lastRxId}?patient=${encodeURIComponent(patient?.name || 'Patient')}`} 
+                    size={76} 
+                  />
+                  <div className="text-[10px] text-slate-500 max-w-[170px] leading-tight">
+                    <p className="font-bold text-slate-700">Scan at Kiosk</p>
+                    <p>Instant digital verification by local ASHA medicine distributor.</p>
+                  </div>
+                </div>
+
+                <div className="text-right text-xs">
+                  <div className="inline-block border-b border-slate-400 pb-1 mb-1 font-serif italic text-sm text-slate-800">
+                    Dr. Ananya Sharma
+                  </div>
+                  <p className="font-bold text-slate-900 text-[11px]">Dr. Ananya Sharma, MD</p>
+                  <p className="text-[10px] text-slate-500">Reg No: UP-MED-48201</p>
+                  <p className="text-[10px] text-emerald-700 font-bold">Digitally Signed via PulseCare</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

@@ -15,9 +15,9 @@ import {
   Lock
 } from 'lucide-react';
 
-export function CommandHeaderMetrics({ queueCount = 18 }) {
+export function CommandHeaderMetrics({ queueCount = 18, onDispatch108 }) {
   return (
-    <div className="w-full bg-white rounded-2xl p-4 sm:p-5 border border-neutral-200 shadow-sm space-y-4">
+    <div className="w-full bg-white rounded-2xl p-4 sm:p-5 border border-neutral-200 shadow-sm space-y-4 text-left">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-3">
         <div className="flex items-center gap-2.5">
           <div>
@@ -31,7 +31,15 @@ export function CommandHeaderMetrics({ queueCount = 18 }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-teal/10 text-brand-teal text-xs font-bold border border-brand-teal/20">
+          <button
+            type="button"
+            onClick={onDispatch108}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-900/30 active:scale-95 transition-all"
+          >
+            <Ambulance className="w-4 h-4 animate-pulse" />
+            <span>108 EMS Dispatch</span>
+          </button>
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-teal/10 text-brand-teal text-xs font-bold border border-brand-teal/20">
             <Radio className="w-3.5 h-3.5" />
             <span>Low-Bandwidth Mode: Auto Fallback ON</span>
           </span>
