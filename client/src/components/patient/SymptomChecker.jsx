@@ -20,21 +20,143 @@ import {
   Leaf,
   Info,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Calendar,
+  Database,
+  Zap,
+  Check,
+  Target,
+  Clock,
+  Radio
 } from 'lucide-react';
-import { evaluateSymptoms, getTriageRationale } from '../../utils/triageTree.js';
+import { evaluateSymptoms, getTriageRationale, calculateDynamicTriageScore } from '../../utils/triageTree.js';
 import { TRANSLATIONS } from '../../utils/translations.js';
 
-const COMMON_SYMPTOMS = [
-  { id: 'fever', labelEn: 'Fever / High Temperature', labelHi: 'तेज़ बुखार / तपन' },
-  { id: 'cough', labelEn: 'Cough / Sore Throat', labelHi: 'खांसी / गले में खराश' },
-  { id: 'body ache', labelEn: 'Body Ache / Fatigue', labelHi: 'बदन दर्द / थकान' },
-  { id: 'headache', labelEn: 'Persistent Headache', labelHi: 'सिरदर्द / चक्कर' },
-  { id: 'chest pain', labelEn: 'Chest Pain / Pressure (Critical)', labelHi: 'छाती में दर्द / दबाव (गंभीर)' },
-  { id: 'difficulty breathing', labelEn: 'Difficulty Breathing (Critical)', labelHi: 'सांस लेने में तकलीफ (गंभीर)' },
-  { id: 'vomiting', labelEn: 'Vomiting / Loose Motion', labelHi: 'उल्टी / दस्त / निर्जलीकरण' },
-  { id: 'joint pain', labelEn: 'Joint / Knee Pain', labelHi: 'जोड़ों व घुटनों में दर्द' },
+const CLINICAL_ZONES = [
+  { id: 'chest', labelHi: 'छाती / फेफड़े (Chest)', labelEn: 'Chest / Lungs', shortHi: 'छाती', shortEn: 'Chest' },
+  { id: 'head', labelHi: 'सिर (Head)', labelEn: 'Head / Neuro', shortHi: 'सिर', shortEn: 'Head' },
+  { id: 'abdomen', labelHi: 'पेट (Abdomen)', labelEn: 'Abdomen / Gastro', shortHi: 'पेट', shortEn: 'Abdomen' },
+  { id: 'general', labelHi: 'सामान्य / बदन', labelEn: 'General / Limbs', shortHi: 'सामान्य', shortEn: 'General' },
 ];
+
+const ZONE_SYMPTOMS = {
+  chest: [
+    {
+      id: 'shortness_of_breath',
+      labelHi: 'सांस लेने में तकलीफ (Shortness of Breath)',
+      labelEn: 'Shortness of Breath',
+      descHi: 'Stridor / Wheezing noted at rest (विश्राम में भी घरघराहट)',
+      descEn: 'Stridor / Wheezing noted at rest',
+      isCritical: true,
+      color: 'rose'
+    },
+    {
+      id: 'high_fever',
+      labelHi: 'तीव्र बुखार (>101°F High Fever)',
+      labelEn: 'High Fever (>101°F)',
+      descHi: 'Axillary temperature recorded: 102.4°F (तपन व कंपन)',
+      descEn: 'Axillary temperature recorded: 102.4°F',
+      color: 'emerald'
+    },
+    {
+      id: 'dry_cough',
+      labelHi: 'सूखी खांसी (Dry Cough - 3+ days)',
+      labelEn: 'Dry Cough (3+ days)',
+      descHi: 'Continuous nocturnal hacking (रात में लगातार तेज खांसी)',
+      descEn: 'Continuous nocturnal hacking cough',
+      color: 'teal'
+    },
+    {
+      id: 'fatigue',
+      labelHi: 'थकान / कमजोरी (Fatigue & Lethargy)',
+      labelEn: 'Fatigue & Lethargy',
+      descHi: 'Inability to perform normal chores (अत्यधिक शिथिलता)',
+      descEn: 'Inability to perform normal daily chores',
+      color: 'slate'
+    },
+    {
+      id: 'chest_heaviness',
+      labelHi: 'सीने में दबाव / दर्द (Chest Heaviness)',
+      labelEn: 'Chest Heaviness / Pain',
+      descHi: 'Pressure or squeezing sensation (जकड़न या भारीपन)',
+      descEn: 'Pressure or squeezing sensation',
+      isCritical: true,
+      color: 'rose'
+    },
+  ],
+  head: [
+    {
+      id: 'severe_headache',
+      labelHi: 'गंभीर सिरदर्द (Severe Thunderclap Headache)',
+      labelEn: 'Severe Thunderclap Headache',
+      descHi: 'अचानक तेज सिरदर्द, प्रकाश से असहजता (Sudden acute pain)',
+      descEn: 'Sudden onset severe cranial pain, photophobia',
+      isCritical: true,
+      color: 'rose'
+    },
+    {
+      id: 'dizziness',
+      labelHi: 'चक्कर / संतुलन खोना (Dizziness & Vertigo)',
+      labelEn: 'Dizziness & Vertigo',
+      descHi: 'खड़े होने पर चक्कर, रक्तचाप में गिरावट (Postural drop)',
+      descEn: 'Postural hypotension, unsteady gait',
+      color: 'amber'
+    },
+    {
+      id: 'neck_stiffness',
+      labelHi: 'गर्दन में अकड़न (Stiff Neck)',
+      labelEn: 'Stiff Neck & Rigidity',
+      descHi: 'गर्दन मोड़ने में दर्द व बुखार (मेनिन्जाइटिस जांच संकेत)',
+      descEn: 'Inability to flex neck forward, meningeal sign',
+      color: 'slate'
+    },
+  ],
+  abdomen: [
+    {
+      id: 'acute_diarrhea',
+      labelHi: 'तीव्र पानी जैसा दस्त (Acute Watery Diarrhea)',
+      labelEn: 'Acute Watery Diarrhea',
+      descHi: 'Severe fluid loss, rapid dehydration risk (निर्जलीकरण खतरा)',
+      descEn: 'High fluid loss, rapid dehydration risk',
+      isCritical: true,
+      color: 'rose'
+    },
+    {
+      id: 'severe_cramping',
+      labelHi: 'पेट में मरोड़ व तेज दर्द (Severe Abdominal Cramps)',
+      labelEn: 'Severe Abdominal Cramping',
+      descHi: 'Localized tenderness, acute intestinal distress (मरोड़)',
+      descEn: 'Localized tenderness, acute intestinal distress',
+      color: 'amber'
+    },
+    {
+      id: 'persistent_vomiting',
+      labelHi: 'लगातार उल्टी (Persistent Vomiting)',
+      labelEn: 'Persistent Vomiting',
+      descHi: 'पानी या ओआरएस पचाने में असमर्थ (Unable to retain fluids)',
+      descEn: 'Inability to retain oral fluids for > 6 hours',
+      color: 'teal'
+    },
+  ],
+  general: [
+    {
+      id: 'joint_muscle_pain',
+      labelHi: 'जोड़ों व मांसपेशियों में दर्द (Joint & Muscle Pain)',
+      labelEn: 'Joint & Muscle Pain',
+      descHi: 'Viral arthralgia, knee & ankle inflammation (जोड़ों में सूजन)',
+      descEn: 'Viral arthralgia, knee & ankle inflammation',
+      color: 'teal'
+    },
+    {
+      id: 'skin_rash',
+      labelHi: 'त्वचा पर दाने / चकत्ते (Skin Rash / Petechiae)',
+      labelEn: 'Skin Rash / Petechiae',
+      descHi: 'बुखार के साथ लाल चकत्ते (डेंगू/वायरल निगरानी)',
+      descEn: 'Erythematous rash with fever surveillance',
+      color: 'amber'
+    },
+  ]
+};
 
 export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
@@ -59,6 +181,35 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
   const [abhaId, setAbhaId] = useState('');
   const [abhaVerified, setAbhaVerified] = useState(false);
   const [abhaRecord, setAbhaRecord] = useState(null);
+
+  // Active Anatomical Zone & Symptom Duration for Offline Deterministic Triage
+  const [activeZone, setActiveZone] = useState('chest');
+  const [symptomDuration, setSymptomDuration] = useState('2-3 दिन');
+
+  // Dynamic Triage Score based on IMNCI-R Guidelines
+  const dynamicTriage = calculateDynamicTriageScore(
+    patientData.vitals,
+    patientData.symptoms,
+    symptomDuration,
+    lang
+  );
+
+  const isZoneSymptomActive = (item) => {
+    return patientData.symptoms.includes(item.id) ||
+           patientData.symptoms.includes(item.labelHi) ||
+           patientData.symptoms.includes(item.labelEn);
+  };
+
+  const toggleZoneSymptom = (item) => {
+    const label = isHi ? item.labelHi : item.labelEn;
+    const isSelected = isZoneSymptomActive(item);
+    setPatientData(prev => ({
+      ...prev,
+      symptoms: isSelected
+        ? prev.symptoms.filter(s => s !== item.id && s !== item.labelHi && s !== item.labelEn)
+        : [...prev.symptoms, label]
+    }));
+  };
 
   // Speech-to-Text Voice Input State
   const [isListening, setIsListening] = useState(false);
@@ -182,7 +333,14 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
 
     const urgency = evaluateSymptoms(effectiveVitals, patientData.symptoms);
     const rationale = getTriageRationale(urgency, effectiveVitals, patientData.symptoms, lang);
-    setTriageResult({ urgency, rationale, effectiveVitals });
+    setTriageResult({
+      urgency,
+      rationale,
+      effectiveVitals,
+      dynamicScore: dynamicTriage.score,
+      protocol: dynamicTriage.protocol,
+      tier: dynamicTriage.tier
+    });
     setStep(3);
   };
 
@@ -208,7 +366,8 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
         village: patientData.village || (isHi ? 'गाँव केंद्र' : 'Village Block'),
         vitals: triageResult?.effectiveVitals || patientData.vitals,
         symptoms: patientData.symptoms.length > 0 ? patientData.symptoms : [isHi ? 'सामान्य परामर्श' : 'General Consultation'],
-        urgency: triageResult?.urgency || 'consultation',
+        urgency: triageResult?.urgency || dynamicTriage.urgency || 'consultation',
+        triageScore: `${dynamicTriage.score}/10`
       });
     }
   };
@@ -384,60 +543,393 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
         </div>
       )}
 
-      {/* STEP 2: Vitals & Symptoms (With Conditional Devices Option) */}
+      {/* STEP 2: Vitals & Symptoms (Interactive Anatomical Body Map & Offline Deterministic IMNCI-R Triage) */}
       {step === 2 && (
-        <div className="space-y-6 text-left">
-          {/* Vitals Card */}
-          <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-3">
-              <div>
-                <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
-                  <HeartPulse className="w-5 h-5 text-brand-marigold" />
-                  <span>{t.vitalsTitle}</span>
-                </h3>
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  {t.vitalsSubtitle}
-                </p>
+        <div className="space-y-4 text-left">
+          {/* Top Offline Engine & RuleSet Indicator */}
+          <div className="flex items-center justify-between text-xs bg-slate-900/5 px-3 py-1.5 rounded-lg border border-slate-200">
+            <div className="flex items-center gap-2 text-emerald-700 font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>100% Offline: Local SQLite Engine</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full font-bold text-[11px]">
+              <Zap className="w-3 h-3" />
+              <span>v4.2 RuleSet</span>
+            </div>
+          </div>
+
+          {/* Step Header */}
+          <div>
+            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-teal-800 mb-1">
+              <span>{isHi ? 'चरण 2 OF 4 • STEP 2 OF 4' : 'STEP 2 OF 4 • CLINICAL TRIAGE'}</span>
+              <span className="bg-teal-50 text-teal-900 border border-teal-200 px-2 py-0.5 rounded-full">
+                Chief Complaints
+              </span>
+            </div>
+            <div className="w-full bg-teal-100 h-1.5 rounded-full overflow-hidden mb-2">
+              <div className="bg-[#00594C] h-full w-1/2 rounded-full" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900">
+              {isHi ? 'सहानुभूति लक्षण जांच' : 'Empathetic Symptom Assessment'}
+            </h2>
+            <p className="text-xs text-slate-500">
+              Deterministic Clinical Protocol • ASHA Assistant
+            </p>
+          </div>
+
+          {/* Anatomical Body Map Selection Card */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                <span className="text-lg">🧍‍♂️</span>
+                <span>{isHi ? 'शारीरिक अंग चुनें (Select Zone)' : 'Select Anatomical Zone'}</span>
+              </div>
+              <span className="text-[11px] font-semibold bg-emerald-50 text-[#00594C] border border-emerald-200 px-2.5 py-0.5 rounded-md">
+                Active: {CLINICAL_ZONES.find(z => z.id === activeZone)?.[isHi ? 'shortHi' : 'shortEn'] || activeZone}
+              </span>
+            </div>
+
+            {/* Visual Body Schematic with Pins */}
+            <div className="relative bg-gradient-to-b from-sky-50/50 to-blue-50/70 border border-sky-100 rounded-xl p-4 flex flex-col items-center justify-center min-h-[160px] overflow-hidden">
+              {/* Silhouette Vector Graphic */}
+              <div className="relative w-48 h-40 flex flex-col items-center justify-center">
+                {/* SVG Silhouette */}
+                <svg className="w-28 h-36 text-blue-200/80" viewBox="0 0 100 130" fill="currentColor">
+                  {/* Head */}
+                  <circle cx="50" cy="18" r="14" />
+                  {/* Neck */}
+                  <rect x="46" y="32" width="8" height="6" rx="2" />
+                  {/* Torso */}
+                  <path d="M26 38 C26 38, 38 36, 50 36 C62 36, 74 38, 74 38 C79 39, 82 45, 80 50 L73 86 C72 90, 68 93, 64 93 L36 93 C32 93, 28 90, 27 86 L20 50 C18 45, 21 39, 26 38 Z" />
+                  {/* Legs */}
+                  <rect x="34" y="93" width="12" height="34" rx="4" />
+                  <rect x="54" y="93" width="12" height="34" rx="4" />
+                </svg>
+
+                {/* Head Pin */}
+                <button
+                  type="button"
+                  onClick={() => setActiveZone('head')}
+                  className={`absolute top-2 transition-all flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border shadow-sm ${
+                    activeZone === 'head'
+                      ? 'bg-[#00594C] text-white border-[#00594C] ring-2 ring-emerald-300 scale-105'
+                      : 'bg-white/90 text-slate-700 border-slate-300 hover:bg-white'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  <span>• सिर (Head)</span>
+                </button>
+
+                {/* Chest Pin (Center) */}
+                <button
+                  type="button"
+                  onClick={() => setActiveZone('chest')}
+                  className={`absolute top-14 transition-all flex items-center gap-1.5 text-xs font-black px-3 py-1 rounded-full border shadow-md ${
+                    activeZone === 'chest'
+                      ? 'bg-[#00594C] text-white border-[#00473c] ring-2 ring-emerald-300 scale-105'
+                      : 'bg-white/90 text-slate-700 border-slate-300 hover:bg-white'
+                  }`}
+                >
+                  <Target className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+                  <span>छाती (Chest)</span>
+                </button>
+
+                {/* Abdomen Pin */}
+                <button
+                  type="button"
+                  onClick={() => setActiveZone('abdomen')}
+                  className={`absolute bottom-6 transition-all flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border shadow-sm ${
+                    activeZone === 'abdomen'
+                      ? 'bg-[#00594C] text-white border-[#00594C] ring-2 ring-emerald-300 scale-105'
+                      : 'bg-white/90 text-slate-700 border-slate-300 hover:bg-white'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  <span>• पेट (Abdomen)</span>
+                </button>
               </div>
 
-              {/* Hardware Toggles for Remote Clinics */}
-              <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+              {/* Zone Button Pills underneath */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5 w-full mt-2 pt-2 border-t border-sky-100">
+                {CLINICAL_ZONES.map(z => (
+                  <button
+                    key={z.id}
+                    type="button"
+                    onClick={() => setActiveZone(z.id)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                      activeZone === z.id
+                        ? 'bg-[#00594C] text-white shadow-sm ring-1 ring-emerald-400'
+                        : 'bg-white/80 text-slate-700 hover:bg-white border border-slate-200'
+                    }`}
+                  >
+                    {isHi ? z.labelHi : z.labelEn}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Active Clinical Markers List */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                <span>महत्वपूर्ण लक्षण (Active Clinical Markers)</span>
+              </h3>
+              <span className="text-xs font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-md">
+                {patientData.symptoms.length} {isHi ? 'चयनित (Selected)' : 'Selected'}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {(ZONE_SYMPTOMS[activeZone] || []).map((item) => {
+                const isSelected = isZoneSymptomActive(item);
+                const isCritical = item.isCritical;
+
+                let cardStyle = 'bg-white border-slate-200 hover:border-slate-300 text-slate-800';
+                let iconBadge = 'bg-slate-100 text-slate-600';
+                let checkStyle = 'text-slate-300';
+
+                if (isSelected) {
+                  if (isCritical) {
+                    cardStyle = 'bg-rose-50/90 border-rose-300 text-rose-950 shadow-sm';
+                    iconBadge = 'bg-rose-600 text-white';
+                    checkStyle = 'text-rose-600';
+                  } else if (item.color === 'emerald') {
+                    cardStyle = 'bg-[#00594C] border-[#00473c] text-white shadow-sm';
+                    iconBadge = 'bg-teal-700 text-white';
+                    checkStyle = 'text-white';
+                  } else {
+                    cardStyle = 'bg-sky-50 border-sky-300 text-slate-900 shadow-sm';
+                    iconBadge = 'bg-sky-600 text-white';
+                    checkStyle = 'text-sky-700';
+                  }
+                }
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => toggleZoneSymptom(item)}
+                    role="button"
+                    tabIndex={0}
+                    className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${cardStyle}`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 font-black text-base shadow-sm ${iconBadge}`}>
+                        {item.id.includes('breath') ? '✱' : item.id.includes('fever') ? '🌡' : item.id.includes('cough') ? '☼' : item.id.includes('fatigue') ? '🔋' : '♥'}
+                      </div>
+                      <div className="min-w-0">
+                        <div className={`font-bold text-sm leading-snug truncate ${isSelected && item.color === 'emerald' ? 'text-white' : ''}`}>
+                          {isHi ? item.labelHi : item.labelEn}
+                        </div>
+                        <div className={`text-[11px] leading-tight truncate ${isSelected && item.color === 'emerald' ? 'text-teal-100' : isSelected && isCritical ? 'text-rose-700' : 'text-slate-500'}`}>
+                          {isHi ? item.descHi : item.descEn}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0">
+                      {isSelected ? (
+                        <CheckSquare className={`w-6 h-6 ${checkStyle}`} />
+                      ) : (
+                        <Square className="w-6 h-6 text-slate-300" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Custom Symptom Input with Voice Input Mic */}
+            <div className="bg-white rounded-xl p-3 border border-slate-200 space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                <span>{isHi ? 'अन्य लक्षण (आवाज़ या टाइप करके जोड़ें)' : 'Other Symptom (Voice or Type)'}</span>
+                <button
+                  type="button"
+                  onClick={toggleVoiceInput}
+                  className={`px-2 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all ${
+                    isListening
+                      ? 'bg-rose-600 text-white animate-pulse'
+                      : 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+                  }`}
+                >
+                  {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-emerald-600" />}
+                  <span>{isListening ? (isHi ? 'सुन रहे हैं...' : 'Listening...') : (isHi ? 'बोलकर बताएं' : 'Voice')}</span>
+                </button>
+              </div>
+
+              {speechNotice && (
+                <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                  <span>{speechNotice}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleAddCustomSymptom} className="flex gap-2">
+                <input
+                  type="text"
+                  value={patientData.customSymptom}
+                  onChange={(e) => setPatientData({ ...patientData, customSymptom: e.target.value })}
+                  placeholder={isHi ? 'उदा. सिरदर्द, चक्कर आना...' : 'e.g. Headache, dizziness...'}
+                  className="flex-1 h-10 px-3 rounded-lg border border-slate-300 text-xs font-medium focus:outline-none focus:border-[#00594C]"
+                />
+                <button
+                  type="submit"
+                  className="px-3 h-10 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors"
+                >
+                  {isHi ? 'जोड़ें' : 'Add'}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Symptom Duration Selector */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-2.5">
+            <div className="flex items-center justify-between text-sm font-bold text-slate-900">
+              <span>{isHi ? 'लक्षण कितने दिनों से हैं? (Symptom Duration)' : 'Symptom Duration'}</span>
+              <Calendar className="w-4 h-4 text-slate-400" />
+            </div>
+
+            <div className="grid grid-cols-4 gap-2">
+              {['1 दिन', '2-3 दिन', '1 हफ्ता', '10+ दिन'].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setSymptomDuration(d)}
+                  className={`py-2 rounded-lg font-bold text-xs transition-all text-center ${
+                    symptomDuration === d
+                      ? 'bg-[#00594C] text-white shadow-sm'
+                      : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Real-time Dynamic Triage Outcome Card (Deterministic IMNCI-R) */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3.5">
+            {/* Tier & Score Row */}
+            <div className="flex items-center justify-between">
+              <span className={`px-3 py-1 rounded-full text-xs font-black tracking-wide ${
+                dynamicTriage.color === 'rose'
+                  ? 'bg-rose-100 text-rose-900 border border-rose-200'
+                  : dynamicTriage.color === 'amber'
+                  ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                  : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+              }`}>
+                {isHi ? dynamicTriage.tierHi : dynamicTriage.tier}
+              </span>
+
+              <div className="text-right">
+                <span className="text-2xl font-black text-slate-900">{dynamicTriage.score}</span>
+                <span className="text-xs text-slate-400 font-bold"> / 10</span>
+              </div>
+            </div>
+
+            {/* Fast-Track IMNCI-R Protocol Alert Box */}
+            <div className={`p-3.5 rounded-xl border space-y-1 ${
+              dynamicTriage.color === 'rose'
+                ? 'bg-rose-50 border-rose-200 text-rose-900'
+                : dynamicTriage.color === 'amber'
+                ? 'bg-amber-50/90 border-amber-200 text-amber-900'
+                : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+            }`}>
+              <div className="flex items-center gap-2 font-black text-xs">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                <span>Fast-Track Protocol Triggered</span>
+              </div>
+              <p className="text-xs leading-relaxed font-medium">
+                {dynamicTriage.protocol}
+              </p>
+            </div>
+
+            {/* Available Doctor on Duty Box */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-full bg-teal-100 border border-teal-300 flex items-center justify-center font-bold text-teal-800 text-sm overflow-hidden shrink-0">
+                  👨‍⚕️
+                </div>
+                <div>
+                  <div className="text-xs font-black text-slate-900 leading-tight">
+                    {dynamicTriage.doctorOnDuty.name}
+                  </div>
+                  <div className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>{dynamicTriage.doctorOnDuty.availability}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Direct Join Queue Primary Action Button */}
+            <button
+              type="button"
+              onClick={handleProceedToQueue}
+              className="w-full h-14 bg-[#00594C] hover:bg-[#00473c] text-white font-bold rounded-xl px-4 flex items-center justify-between shadow-md transition-all active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2">
+                <PhoneCall className="w-5 h-5" />
+                <span className="text-sm sm:text-base font-black">
+                  {isHi ? 'परामर्श कतार में जुड़ें / Join Doctor Queue' : 'Join Doctor Queue'}
+                </span>
+              </div>
+              <ArrowRight className="w-5 h-5" />
+            </button>
+
+            {/* First Aid Protocol Link Action */}
+            <button
+              type="button"
+              onClick={handleEvaluate}
+              className="w-full py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+            >
+              <span>🏥</span>
+              <span>{isHi ? 'घर पर प्राथमिक उपचार देखें / First Aid Protocol' : 'View First Aid & Home Protocols'}</span>
+            </button>
+          </div>
+
+          {/* Bottom Edge Cache Badge */}
+          <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500 font-medium py-1">
+            <Database className="w-3.5 h-3.5 text-teal-600" />
+            <span>{isHi ? 'डेटा स्थानीय फोन में सुरक्षित संग्रहीत (Saved in IndexedDB edge cache)' : 'Data saved locally in IndexedDB edge cache'}</span>
+          </div>
+
+          {/* Collapsible Vitals Input Section */}
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                  {isHi ? 'रोगी के महत्वपूर्ण संकेत (Vitals Record)' : 'Patient Vitals (Optional / Field Record)'}
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  {isHi ? 'यदि उपकरण उपलब्ध हों तो थर्मामीटर/बीपी दर्ज करें' : 'Record thermometer / BP if hardware available'}
+                </p>
+              </div>
+              <div className="flex gap-1">
                 <button
                   type="button"
                   onClick={() => setHasThermometer(!hasThermometer)}
-                  className={`px-2.5 py-1 rounded-md border transition-colors ${
-                    hasThermometer ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-neutral-100 border-neutral-200 text-neutral-500 line-through'
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                    hasThermometer ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-slate-100 text-slate-400 line-through'
                   }`}
                 >
-                  {isHi ? 'थर्मामीटर' : 'Thermometer'}
+                  {isHi ? 'थर्मामीटर' : 'Temp'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setHasBpMonitor(!hasBpMonitor)}
-                  className={`px-2.5 py-1 rounded-md border transition-colors ${
-                    hasBpMonitor ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-neutral-100 border-neutral-200 text-neutral-500 line-through'
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                    hasBpMonitor ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-slate-100 text-slate-400 line-through'
                   }`}
                 >
-                  {isHi ? 'बीपी मॉनिटर' : 'BP Monitor'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHasPulseOximeter(!hasPulseOximeter)}
-                  className={`px-2.5 py-1 rounded-md border transition-colors ${
-                    hasPulseOximeter ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-neutral-100 border-neutral-200 text-neutral-500 line-through'
-                  }`}
-                >
-                  {isHi ? 'पल्स ऑक्सीमीटर' : 'Pulse Oximeter'}
+                  {isHi ? 'बीपी' : 'BP'}
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-4 gap-2">
               <div>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1 flex items-center justify-between">
-                  <span>{t.temp}</span>
-                  {!hasThermometer && <span className="text-[10px] text-amber-600 font-bold">{isHi ? 'छोड़ा गया' : 'Skipped'}</span>}
-                </label>
+                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">{t.temp}</label>
                 <input
                   type="text"
                   disabled={!hasThermometer}
@@ -447,19 +939,11 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
                     vitals: { ...patientData.vitals, temp: e.target.value }
                   })}
                   placeholder="98.6"
-                  className={`w-full h-12 px-3 rounded-lg border-2 text-base font-semibold ${
-                    hasThermometer
-                      ? 'border-neutral-200 focus:border-brand-marigold bg-white'
-                      : 'border-neutral-200 bg-neutral-100 text-neutral-400'
-                  }`}
+                  className="w-full h-9 px-2 rounded-lg border text-xs font-bold text-center bg-white"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1 flex items-center justify-between">
-                  <span>{t.bp}</span>
-                  {!hasBpMonitor && <span className="text-[10px] text-amber-600 font-bold">{isHi ? 'छोड़ा गया' : 'Skipped'}</span>}
-                </label>
+                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">{t.bp}</label>
                 <input
                   type="text"
                   disabled={!hasBpMonitor}
@@ -469,19 +953,11 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
                     vitals: { ...patientData.vitals, bp: e.target.value }
                   })}
                   placeholder="120/80"
-                  className={`w-full h-12 px-3 rounded-lg border-2 text-base font-semibold ${
-                    hasBpMonitor
-                      ? 'border-neutral-200 focus:border-brand-marigold bg-white'
-                      : 'border-neutral-200 bg-neutral-100 text-neutral-400'
-                  }`}
+                  className="w-full h-9 px-2 rounded-lg border text-xs font-bold text-center bg-white"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1 flex items-center justify-between">
-                  <span>{t.pulse}</span>
-                  {!hasPulseOximeter && <span className="text-[10px] text-amber-600 font-bold">{isHi ? 'छोड़ा गया' : 'Skipped'}</span>}
-                </label>
+                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">{t.pulse}</label>
                 <input
                   type="text"
                   disabled={!hasPulseOximeter}
@@ -491,19 +967,11 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
                     vitals: { ...patientData.vitals, pulse: e.target.value }
                   })}
                   placeholder="75"
-                  className={`w-full h-12 px-3 rounded-lg border-2 text-base font-semibold ${
-                    hasPulseOximeter
-                      ? 'border-neutral-200 focus:border-brand-marigold bg-white'
-                      : 'border-neutral-200 bg-neutral-100 text-neutral-400'
-                  }`}
+                  className="w-full h-9 px-2 rounded-lg border text-xs font-bold text-center bg-white"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1 flex items-center justify-between">
-                  <span>{t.spo2}</span>
-                  {!hasPulseOximeter && <span className="text-[10px] text-amber-600 font-bold">{isHi ? 'छोड़ा गया' : 'Skipped'}</span>}
-                </label>
+                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">{t.spo2}</label>
                 <input
                   type="text"
                   disabled={!hasPulseOximeter}
@@ -513,106 +981,10 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
                     vitals: { ...patientData.vitals, spo2: e.target.value }
                   })}
                   placeholder="98"
-                  className={`w-full h-12 px-3 rounded-lg border-2 text-base font-semibold ${
-                    hasPulseOximeter
-                      ? 'border-neutral-200 focus:border-brand-marigold bg-white'
-                      : 'border-neutral-200 bg-neutral-100 text-neutral-400'
-                  }`}
+                  className="w-full h-9 px-2 rounded-lg border text-xs font-bold text-center bg-white"
                 />
               </div>
             </div>
-          </div>
-
-          {/* Symptoms Checklist */}
-          <div className="bg-white rounded-2xl p-6 border border-neutral-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-bold text-neutral-900">
-                  {t.observedSymptomsTitle}
-                </h3>
-                <p className="text-sm text-neutral-500">
-                  {t.observedSymptomsSubtitle}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={toggleVoiceInput}
-                title="Speak symptoms (Hindi / English)"
-                className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm ${
-                  isListening
-                    ? 'bg-rose-600 text-white animate-pulse ring-4 ring-rose-200'
-                    : 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
-                }`}
-              >
-                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4 text-emerald-600" />}
-                <span>{isListening ? (isHi ? 'सुन रहे हैं...' : 'Listening...') : (isHi ? 'बोलकर दर्ज करें' : 'Voice Input')}</span>
-              </button>
-            </div>
-
-            {/* Live voice speech indicator */}
-            {speechNotice && (
-              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                <span>{speechNotice}</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-2.5">
-              {COMMON_SYMPTOMS.map((item) => {
-                const label = isHi ? item.labelHi : item.labelEn;
-                const isSelected = patientData.symptoms.includes(label) || 
-                  patientData.symptoms.includes(item.labelEn) || 
-                  patientData.symptoms.includes(item.labelHi);
-                const isCritical = item.id === 'chest pain' || item.id === 'difficulty breathing';
-
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => toggleSymptom(label)}
-                    className={`h-14 px-4 rounded-xl border-2 text-left flex items-center justify-between font-semibold text-base transition-all ${
-                      isSelected
-                        ? isCritical
-                          ? 'border-rose-500 bg-rose-50 text-rose-900 shadow-sm'
-                          : 'border-brand-marigold bg-brand-marigold/10 text-brand-marigoldDark shadow-sm'
-                        : isCritical
-                        ? 'border-neutral-200 hover:border-rose-300 text-neutral-800'
-                        : 'border-neutral-200 hover:border-neutral-300 text-neutral-800'
-                    }`}
-                  >
-                    <span>{label}</span>
-                    {isSelected && <CheckCircle2 className="w-5 h-5 shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Custom Symptom Input with Voice Mic */}
-            <form onSubmit={handleAddCustomSymptom} className="flex gap-2 pt-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={patientData.customSymptom}
-                  onChange={(e) => setPatientData({ ...patientData, customSymptom: e.target.value })}
-                  placeholder={t.customSymptomPlaceholder}
-                  className="w-full h-12 pl-3 pr-10 rounded-lg border-2 border-neutral-200 focus:border-brand-marigold text-sm font-medium"
-                />
-                <button
-                  type="button"
-                  onClick={toggleVoiceInput}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-neutral-500 hover:text-emerald-700 transition-colors"
-                  title="Speak in Hindi/English"
-                >
-                  <Mic className="w-4 h-4" />
-                </button>
-              </div>
-              <button
-                type="submit"
-                className="px-4 h-12 bg-neutral-100 hover:bg-neutral-200 rounded-lg text-sm font-semibold text-neutral-700 transition-colors"
-              >
-                {t.addSymptom}
-              </button>
-            </form>
           </div>
         </div>
       )}

@@ -71,6 +71,9 @@ export default function App() {
     onDegradationStateChange: (degraded, rttValue) => {
       setNetworkStatus(degraded ? 'degraded' : 'stable');
       if (rttValue) setSimulatedRtt(rttValue);
+      if (degraded) {
+        setIsChatOpen(true);
+      }
     },
     onRttUpdate: (rttValue) => {
       if (rttValue) setSimulatedRtt(rttValue);
@@ -293,6 +296,7 @@ export default function App() {
       webrtc.setDegradedMode(true, 580, '2g');
       setNetworkStatus('degraded');
       setSimulatedRtt(580);
+      setIsChatOpen(true);
     } else if (mode === 'offline') {
       webrtc.setDegradedMode(true, 999, 'offline');
       setNetworkStatus('offline');
@@ -476,7 +480,7 @@ export default function App() {
                     />
 
                     {/* Emergency Clinical Text Relay for Doctor */}
-                    {(isChatOpen || networkStatus === 'offline') && (
+                    {(isChatOpen || networkStatus === 'degraded' || networkStatus === 'offline') && (
                       <EmergencyTextRelay
                         messages={chatMessages}
                         onSendMessage={handleSendChatMessage}

@@ -125,14 +125,14 @@ export default function CallInterface({
         lang={lang}
       />
 
-      {/* Emergency Low-Bandwidth Text Relay Drawer (Active during call / fallback) */}
-      {(isChatOpen || networkStatus === 'offline') && (
+      {/* Emergency Low-Bandwidth Text Relay Drawer (Auto-opened on fallback / 2G / audio-only) */}
+      {(isChatOpen || isAudioOnly || networkStatus === 'degraded' || networkStatus === 'offline') && (
         <EmergencyTextRelay
           messages={messages}
           onSendMessage={onSendMessage}
           currentUserRole="Patient"
           isOffline={networkStatus === 'offline'}
-          isAudioOnly={isAudioOnly}
+          isAudioOnly={isAudioOnly || networkStatus === 'degraded'}
           lang={lang}
         />
       )}
