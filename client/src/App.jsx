@@ -456,6 +456,7 @@ export default function App() {
                       {/* Patient Remote Video */}
                       <VideoPlayer
                         stream={webrtc.remoteStream}
+                        fallbackStream={webrtc.localStream}
                         isLocal={false}
                         isAudioOnly={networkStatus === 'degraded'}
                         peerName={selectedPatient?.name || 'Patient'}

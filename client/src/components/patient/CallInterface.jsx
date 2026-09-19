@@ -160,9 +160,10 @@ export default function CallInterface({
       <div className="relative">
         <VideoPlayer
           stream={remoteStream}
+          fallbackStream={localStream}
           isLocal={false}
           isAudioOnly={isAudioOnly}
-          peerName={doctor?.name || 'Dr. Rajesh Sharma (Hub MD)'}
+          peerName={doctor?.name || 'Dr. Ananya Sharma, MBBS, MD'}
           rtt={rtt}
         />
 

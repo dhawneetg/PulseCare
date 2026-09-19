@@ -49,12 +49,13 @@ export function setupRoomHandlers(io, socket) {
 
   // Client joins the waiting room queue
   socket.on('join-queue', (payload) => {
-    const { patientId, name, age, vitals, symptoms, urgency } = payload || {};
+    const { id, patientId, name, age, vitals, symptoms, urgency } = payload || {};
+    const resolvedId = id || patientId || `p_${Date.now()}`;
     
     // Check if already in queue to avoid duplicates
-    const existingIndex = patientQueue.findIndex(p => p.id === patientId || p.socketId === socket.id);
+    const existingIndex = patientQueue.findIndex(p => p.id === resolvedId || p.socketId === socket.id);
     const patientRecord = {
-      id: patientId || `p_${Date.now()}`,
+      id: resolvedId,
       name: name || 'Anonymous Patient',
       age: age || 30,
       vitals: vitals || { temp: '98.6', bp: '120/80' },
