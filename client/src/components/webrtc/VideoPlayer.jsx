@@ -30,10 +30,6 @@ export default function VideoPlayer({
           audioRef.current.muted = false;
           audioRef.current.play().then(() => setPlayBlocked(false)).catch(() => {});
         }
-        if (videoRef.current) {
-          videoRef.current.muted = false;
-          videoRef.current.play().then(() => setPlayBlocked(false)).catch(() => {});
-        }
       }
     };
     window.addEventListener('click', unlockAudio, { passive: true });
@@ -52,7 +48,8 @@ export default function VideoPlayer({
       if (video.srcObject !== activeStream) {
         video.srcObject = activeStream;
       }
-      video.muted = !!isLocal || useMirrorFeed;
+      // Video is kept muted for 100% bulletproof browser autoplay (audio is handled by dedicated audioRef below)
+      video.muted = true;
 
       // Ensure remote audio element receives audio stream directly
       if (!isLocal && !useMirrorFeed && audioRef.current) {
@@ -60,24 +57,25 @@ export default function VideoPlayer({
           audioRef.current.srcObject = activeStream;
         }
         audioRef.current.muted = false;
-        audioRef.current.play().catch(() => {});
+        audioRef.current.play().then(() => setPlayBlocked(false)).catch((err) => {
+          console.warn('[PulseCare] Audio autoplay waiting for gesture:', err);
+          setPlayBlocked(true);
+        });
       }
 
       const checkFrames = () => {
         if (!video) return;
         const videoTrack = activeStream?.getVideoTracks?.()[0];
-        const isTrackLive = videoTrack && videoTrack.readyState === 'live' && !videoTrack.muted;
+        const isTrackLive = videoTrack && videoTrack.readyState === 'live';
 
         if (isLocal || useMirrorFeed) {
           if (video.videoWidth > 0 && video.videoHeight > 0) {
             setHasRealFrames(true);
           }
         } else {
-          // For remote stream: verify track is unmuted and packets are rendering
-          if (video.videoWidth > 0 && video.videoHeight > 0 && (isTrackLive || video.currentTime > 0)) {
+          // For remote stream: any active track or rendering frames triggers real video
+          if ((video.videoWidth > 0 && video.videoHeight > 0) || isTrackLive || video.currentTime > 0) {
             setHasRealFrames(true);
-          } else if (videoTrack && videoTrack.muted) {
-            setHasRealFrames(false);
           }
         }
       };
@@ -86,13 +84,8 @@ export default function VideoPlayer({
       if (videoTrack) {
         videoTrack.onunmute = () => {
           console.log('[PulseCare] Video track unmuted, frames flowing!');
+          setHasRealFrames(true);
           checkFrames();
-        };
-        videoTrack.onmute = () => {
-          console.log('[PulseCare] Video track muted, waiting for packets...');
-          if (!isLocal && !useMirrorFeed) {
-            setHasRealFrames(false);
-          }
         };
       }
 
@@ -101,23 +94,12 @@ export default function VideoPlayer({
         if (playPromise !== undefined) {
           playPromise
             .then(() => {
-              setPlayBlocked(false);
               checkFrames();
             })
             .catch((err) => {
-              console.warn('[PulseCare] Autoplay audio blocked, attempting muted play:', err);
-              // Fallback to muted playback so the video appears IMMEDIATELY
+              console.warn('[PulseCare] Video autoplay attempt note:', err);
               video.muted = true;
-              video.play()
-                .then(() => {
-                  if (!isLocal && !useMirrorFeed) setPlayBlocked(true);
-                  else setPlayBlocked(false);
-                  checkFrames();
-                })
-                .catch((mutedErr) => {
-                  console.warn('[PulseCare] Muted autoplay also rejected:', mutedErr);
-                  setPlayBlocked(true);
-                });
+              video.play().catch(() => {});
             });
         }
       };
@@ -132,7 +114,7 @@ export default function VideoPlayer({
       video.ontimeupdate = checkFrames;
 
       // Periodically check if video dimensions and packets became active
-      const frameCheckInterval = setInterval(checkFrames, 500);
+      const frameCheckInterval = setInterval(checkFrames, 400);
       return () => clearInterval(frameCheckInterval);
     } else {
       video.srcObject = null;
@@ -141,17 +123,26 @@ export default function VideoPlayer({
   }, [activeStream, isLocal, useMirrorFeed]);
 
   const handleManualPlay = () => {
+    if (audioRef.current) {
+      audioRef.current.muted = false;
+      audioRef.current.play().then(() => setPlayBlocked(false)).catch(() => {});
+    }
     if (videoRef.current) {
-      videoRef.current.muted = false;
-      videoRef.current.play().then(() => setPlayBlocked(false)).catch(() => {
-        videoRef.current.muted = true;
-        videoRef.current.play().then(() => setPlayBlocked(false)).catch(() => {});
-      });
+      videoRef.current.muted = true;
+      videoRef.current.play().catch(() => {});
     }
   };
 
+  // Check if activeStream has at least one live video track
+  const hasVideoTrack = !!(
+    activeStream &&
+    activeStream.getVideoTracks &&
+    activeStream.getVideoTracks().length > 0 &&
+    activeStream.getVideoTracks().some((t) => t.readyState !== 'ended')
+  );
+
   // Determine whether actual video frames are streaming on the canvas/video surface
-  const isDisplayingRealVideo = isLocal || useMirrorFeed || hasRealFrames;
+  const isDisplayingRealVideo = isLocal || useMirrorFeed || hasVideoTrack || hasRealFrames;
 
   return (
     <div 
@@ -164,9 +155,9 @@ export default function VideoPlayer({
         autoPlay
         playsInline
         webkit-playsinline="true"
-        muted={isLocal || useMirrorFeed}
+        muted={true}
         className={`w-full h-full object-cover ${(isLocal || useMirrorFeed) ? 'scale-x-[-1]' : ''} ${
-          isDisplayingRealVideo && !isAudioOnly ? 'opacity-100' : 'opacity-0 pointer-events-none absolute inset-0'
+          isDisplayingRealVideo && !isAudioOnly ? 'block opacity-100' : 'opacity-0 pointer-events-none absolute inset-0'
         }`}
       />
 

@@ -268,8 +268,38 @@ export default function App() {
     }
   };
 
-  // Note: Native WebRTC handles all live audio and video via hardware-accelerated SRTP.
-  // Previous canvas snapshot loops and MediaRecorder chunks were freezing the UI thread and saturating WebSockets.
+  // Adaptive visual frame fallback: only transmits while WebRTC is establishing across NAT/firewalls
+  // As soon as WebRTC connects (webrtc.isCallConnected === true), this automatically turns off completely
+  useEffect(() => {
+    if (!activeRoomId || !webrtc.localStream || isVideoDisabled || webrtc.isCallConnected) return;
+    const videoTracks = webrtc.localStream.getVideoTracks();
+    if (videoTracks.length === 0) return;
+
+    const offscreenVideo = document.createElement('video');
+    offscreenVideo.muted = true;
+    offscreenVideo.playsInline = true;
+    offscreenVideo.srcObject = webrtc.localStream;
+    offscreenVideo.play().catch(() => {});
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 240;
+    canvas.height = 180;
+    const ctx = canvas.getContext('2d');
+
+    const frameInterval = setInterval(() => {
+      if (!activeRoomIdRef.current || webrtc.isCallConnected) return;
+      if (offscreenVideo.videoWidth > 0) {
+        ctx.drawImage(offscreenVideo, 0, 0, 240, 180);
+        const frameData = canvas.toDataURL('image/jpeg', 0.35);
+        signalingRef.current?.sendVideoFrame(activeRoomIdRef.current, frameData);
+      }
+    }, 1200);
+
+    return () => {
+      clearInterval(frameInterval);
+      offscreenVideo.srcObject = null;
+    };
+  }, [activeRoomId, webrtc.localStream, isVideoDisabled, webrtc.isCallConnected]);
 
   const handleReconnectConsultation = async () => {
     if (activeRoomId) {
