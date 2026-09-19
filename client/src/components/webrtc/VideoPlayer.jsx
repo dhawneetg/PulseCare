@@ -13,21 +13,30 @@ export default function VideoPlayer({
   const [playBlocked, setPlayBlocked] = React.useState(false);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      if (videoRef.current.srcObject !== stream) {
-        videoRef.current.srcObject = stream;
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (stream) {
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
       }
-      const playPromise = videoRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            setPlayBlocked(false);
-          })
-          .catch((err) => {
-            console.warn('[PulseCare] Autoplay blocked on device, requiring tap:', err);
-            setPlayBlocked(true);
-          });
-      }
+      const attemptPlay = () => {
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setPlayBlocked(false);
+            })
+            .catch((err) => {
+              console.warn('[PulseCare] Autoplay blocked on device, requiring tap:', err);
+              setPlayBlocked(true);
+            });
+        }
+      };
+      attemptPlay();
+      video.onloadedmetadata = attemptPlay;
+    } else {
+      video.srcObject = null;
     }
   }, [stream]);
 
@@ -42,18 +51,17 @@ export default function VideoPlayer({
       onClick={playBlocked ? handleManualPlay : undefined}
       className="relative w-full aspect-video bg-neutral-900 rounded-2xl overflow-hidden shadow-sm flex items-center justify-center border-2 border-neutral-800"
     >
-      {/* Active Video & Audio Stream - Always kept mounted so audio tracks play uninterrupted */}
-      {stream && (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isLocal}
-          className={`w-full h-full object-cover ${isLocal ? 'scale-x-[-1]' : ''} ${
-            isAudioOnly ? 'hidden' : 'block'
-          }`}
-        />
-      )}
+      {/* Active Video & Audio Stream - Always kept mounted in DOM for mobile autoplay permissions */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        webkit-playsinline="true"
+        muted={isLocal}
+        className={`w-full h-full object-cover ${isLocal ? 'scale-x-[-1]' : ''} ${
+          !stream || isAudioOnly ? 'hidden' : 'block'
+        }`}
+      />
 
       {/* Mobile Autoplay Permission Overlay */}
       {playBlocked && !isLocal && (

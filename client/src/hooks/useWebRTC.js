@@ -367,12 +367,17 @@ export function useWebRTC({
    */
   const createPeerConnection = useCallback((roomId) => {
     roomIdRef.current = roomId;
-    if (peerConnectionRef.current) {
+    if (peerConnectionRef.current && peerConnectionRef.current.signalingState !== 'closed') {
       try {
         peerConnectionRef.current.close();
       } catch (e) {}
     }
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const pc = new RTCPeerConnection({
+      iceServers: ICE_SERVERS,
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require',
+      iceCandidatePoolSize: 6,
+    });
     peerConnectionRef.current = pc;
 
     // Attach local media tracks
@@ -437,14 +442,30 @@ export function useWebRTC({
       stream = await startLocalMedia();
     }
 
-    const pc = createPeerConnection(roomId);
+    let pc = peerConnectionRef.current;
+    // Glare protection: If local offer is already pending, re-send it without tearing down the connection
+    if (pc && pc.signalingState === 'have-local-offer' && pc.localDescription) {
+      console.log('[PulseCare] Re-sending active local offer for room:', roomId);
+      if (onSendOffer) onSendOffer(pc.localDescription, roomId);
+      return;
+    }
+
+    if (pc && pc.connectionState === 'connected') {
+      console.log('[PulseCare] PeerConnection already connected, skipping redundant offer');
+      return;
+    }
+
+    pc = createPeerConnection(roomId);
 
     // Create DataChannel named 'ui-state-sync' per architecture.md Section 6
     const dataChannel = pc.createDataChannel('ui-state-sync');
     dataChannelRef.current = dataChannel;
     attachDataChannelListeners(dataChannel);
 
-    const offer = await pc.createOffer();
+    const offer = await pc.createOffer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: true,
+    });
     await pc.setLocalDescription(offer);
 
     if (onSendOffer) {
@@ -461,7 +482,10 @@ export function useWebRTC({
       stream = await startLocalMedia();
     }
 
-    const pc = createPeerConnection(roomId);
+    let pc = peerConnectionRef.current;
+    if (!pc || pc.signalingState === 'closed') {
+      pc = createPeerConnection(roomId);
+    }
 
     // Listen for incoming DataChannel
     pc.ondatachannel = (event) => {
@@ -469,27 +493,42 @@ export function useWebRTC({
       attachDataChannelListeners(event.channel);
     };
 
-    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-    // Flush any early buffered ICE candidates
-    await flushIceCandidates(pc);
+    try {
+      if (pc.signalingState !== 'stable') {
+        console.log('[PulseCare] Resetting connection for fresh offer in state:', pc.signalingState);
+        pc = createPeerConnection(roomId);
+        pc.ondatachannel = (event) => {
+          dataChannelRef.current = event.channel;
+          attachDataChannelListeners(event.channel);
+        };
+      }
 
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      await flushIceCandidates(pc);
 
-    if (onSendAnswer) {
-      onSendAnswer(answer, roomId);
+      const answer = await pc.createAnswer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
+      await pc.setLocalDescription(answer);
+
+      if (onSendAnswer) {
+        onSendAnswer(answer, roomId);
+      }
+    } catch (err) {
+      console.error('[PulseCare] Error handling remote offer:', err);
     }
-  }, [startLocalMedia, createPeerConnection, attachDataChannelListeners, onSendAnswer]);
+  }, [startLocalMedia, createPeerConnection, attachDataChannelListeners, onSendAnswer, flushIceCandidates]);
 
   /**
    * Helper to flush buffered ICE candidates
    */
   const flushIceCandidates = useCallback(async (pc) => {
-    if (!pc) return;
+    if (!pc || !pc.remoteDescription) return;
     while (iceCandidateQueueRef.current.length > 0) {
       const candidate = iceCandidateQueueRef.current.shift();
       try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        await pc.addIceCandidate(candidate);
       } catch (err) {
         console.warn('[PulseCare] Error adding buffered ICE candidate:', err);
       }
@@ -501,9 +540,15 @@ export function useWebRTC({
    */
   const handleReceiveAnswer = useCallback(async (sdp) => {
     const pc = peerConnectionRef.current;
-    if (pc) {
-      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      await flushIceCandidates(pc);
+    if (pc && pc.signalingState === 'have-local-offer') {
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        await flushIceCandidates(pc);
+      } catch (err) {
+        console.warn('[PulseCare] Error applying remote answer:', err);
+      }
+    } else {
+      console.log('[PulseCare] Answer ignored: signalingState is', pc?.signalingState);
     }
   }, [flushIceCandidates]);
 
@@ -515,7 +560,7 @@ export function useWebRTC({
     const pc = peerConnectionRef.current;
     if (pc && pc.remoteDescription && pc.remoteDescription.type) {
       try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        await pc.addIceCandidate(candidate);
       } catch (err) {
         console.warn('[PulseCare] Error adding ICE candidate:', err);
       }

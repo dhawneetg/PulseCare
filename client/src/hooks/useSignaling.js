@@ -28,6 +28,21 @@ export function useSignaling({
   const [isConnected, setIsConnected] = useState(false);
   const [socketId, setSocketId] = useState(null);
 
+  // Keep latest callbacks in a mutable ref to eliminate stale closure bugs across mobile peers
+  const callbacksRef = useRef({});
+  useEffect(() => {
+    callbacksRef.current = {
+      onQueueUpdated,
+      onIncomingCall,
+      onOffer,
+      onAnswer,
+      onIceCandidate,
+      onCallEnded,
+      onTextRelay,
+      onPeerJoined,
+    };
+  });
+
   useEffect(() => {
     const socket = io(WS_ENDPOINT, {
       transports: ['websocket', 'polling'],
@@ -47,53 +62,37 @@ export function useSignaling({
       console.log('[PulseCare] Signaling socket disconnected');
     });
 
-    if (onQueueUpdated) {
-      socket.on(SOCKET_EVENTS.QUEUE_UPDATED, (queue) => {
-        onQueueUpdated(queue);
-      });
-    }
+    socket.on(SOCKET_EVENTS.QUEUE_UPDATED, (queue) => {
+      callbacksRef.current.onQueueUpdated?.(queue);
+    });
 
-    if (onIncomingCall) {
-      socket.on(SOCKET_EVENTS.CALL_INITIATE, (data) => {
-        onIncomingCall(data);
-      });
-    }
+    socket.on(SOCKET_EVENTS.CALL_INITIATE, (data) => {
+      callbacksRef.current.onIncomingCall?.(data);
+    });
 
-    if (onOffer) {
-      socket.on(SOCKET_EVENTS.SIGNAL_OFFER, (data) => {
-        onOffer(data);
-      });
-    }
+    socket.on(SOCKET_EVENTS.SIGNAL_OFFER, (data) => {
+      callbacksRef.current.onOffer?.(data);
+    });
 
-    if (onAnswer) {
-      socket.on(SOCKET_EVENTS.SIGNAL_ANSWER, (data) => {
-        onAnswer(data);
-      });
-    }
+    socket.on(SOCKET_EVENTS.SIGNAL_ANSWER, (data) => {
+      callbacksRef.current.onAnswer?.(data);
+    });
 
-    if (onIceCandidate) {
-      socket.on(SOCKET_EVENTS.ICE_CANDIDATE, (data) => {
-        onIceCandidate(data);
-      });
-    }
+    socket.on(SOCKET_EVENTS.ICE_CANDIDATE, (data) => {
+      callbacksRef.current.onIceCandidate?.(data);
+    });
 
-    if (onCallEnded) {
-      socket.on(SOCKET_EVENTS.CALL_ENDED, (data) => {
-        onCallEnded(data);
-      });
-    }
+    socket.on(SOCKET_EVENTS.CALL_ENDED, (data) => {
+      callbacksRef.current.onCallEnded?.(data);
+    });
 
-    if (onTextRelay) {
-      socket.on(SOCKET_EVENTS.TEXT_RELAY, (data) => {
-        onTextRelay(data);
-      });
-    }
+    socket.on(SOCKET_EVENTS.TEXT_RELAY, (data) => {
+      callbacksRef.current.onTextRelay?.(data);
+    });
 
-    if (onPeerJoined) {
-      socket.on(SOCKET_EVENTS.PEER_JOINED, (data) => {
-        onPeerJoined(data);
-      });
-    }
+    socket.on(SOCKET_EVENTS.PEER_JOINED, (data) => {
+      callbacksRef.current.onPeerJoined?.(data);
+    });
 
     return () => {
       socket.disconnect();
