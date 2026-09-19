@@ -119,5 +119,30 @@ export function setupSignalingHandlers(io, socket) {
       });
     }
   });
+
+  // Low-bandwidth audio chunk relay over Socket.io (Infallible fallback when WebRTC P2P is blocked by NAT)
+  socket.on('audio-chunk', ({ roomId, chunk }) => {
+    if (roomId && chunk) {
+      socket.join(roomId);
+      socket.to(roomId).emit('audio-chunk', {
+        chunk,
+        roomId,
+        from: socket.id
+      });
+    }
+  });
+
+  // Low-bandwidth video frame snapshot relay over Socket.io (Adaptive 2G/3G visual fallback)
+  socket.on('video-frame', ({ roomId, frame }) => {
+    if (roomId && frame) {
+      socket.join(roomId);
+      socket.to(roomId).emit('video-frame', {
+        frame,
+        roomId,
+        from: socket.id
+      });
+    }
+  });
 }
+
 

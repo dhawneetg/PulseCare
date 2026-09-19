@@ -23,6 +23,8 @@ export function useSignaling({
   onCallEnded,
   onTextRelay,
   onPeerJoined,
+  onAudioChunk,
+  onVideoFrame,
 } = {}) {
   const socketRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -40,6 +42,8 @@ export function useSignaling({
       onCallEnded,
       onTextRelay,
       onPeerJoined,
+      onAudioChunk,
+      onVideoFrame,
     };
   });
 
@@ -92,6 +96,14 @@ export function useSignaling({
 
     socket.on(SOCKET_EVENTS.PEER_JOINED, (data) => {
       callbacksRef.current.onPeerJoined?.(data);
+    });
+
+    socket.on('audio-chunk', (data) => {
+      callbacksRef.current.onAudioChunk?.(data);
+    });
+
+    socket.on('video-frame', (data) => {
+      callbacksRef.current.onVideoFrame?.(data);
     });
 
     return () => {
@@ -147,6 +159,18 @@ export function useSignaling({
     }
   }, []);
 
+  const sendAudioChunk = useCallback((roomId, chunk) => {
+    if (socketRef.current?.connected && roomId && chunk) {
+      socketRef.current.emit('audio-chunk', { roomId, chunk });
+    }
+  }, []);
+
+  const sendVideoFrame = useCallback((roomId, frame) => {
+    if (socketRef.current?.connected && roomId && frame) {
+      socketRef.current.emit('video-frame', { roomId, frame });
+    }
+  }, []);
+
   const endCallSignaling = useCallback((roomId) => {
     if (socketRef.current?.connected && roomId) {
       socketRef.current.emit(SOCKET_EVENTS.CALL_ENDED, { roomId });
@@ -165,6 +189,8 @@ export function useSignaling({
     sendAnswer,
     sendIceCandidate,
     sendTextRelay,
+    sendAudioChunk,
+    sendVideoFrame,
     endCallSignaling,
   };
 }

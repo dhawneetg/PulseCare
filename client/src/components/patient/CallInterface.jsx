@@ -29,6 +29,7 @@ export default function CallInterface({
   isChatOpen = false,
   onToggleChat,
   onReconnect = null,
+  relayFrame = null,
   lang = 'en',
 }) {
   const isHi = lang === 'hi';
@@ -149,6 +150,32 @@ export default function CallInterface({
 
   return (
     <div className="max-w-xl mx-auto w-full px-4 py-4 space-y-4">
+      {/* Prominent Mobile Camera Activation Banner (Critical for Android/iOS permissions) */}
+      {!localStream && onStartMedia && (
+        <div className="bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-neutral-950 p-3 sm:p-4 rounded-2xl shadow-lg border-2 border-amber-300 flex items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-neutral-950 text-amber-400 flex items-center justify-center shrink-0 shadow-sm">
+              <Video className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-black text-xs sm:text-sm text-neutral-950">
+                {isHi ? 'कैमरा व माइक्रोफ़ोन अनुमति आवश्यक' : 'Camera & Microphone Access Required'}
+              </div>
+              <p className="text-[11px] text-neutral-900 font-medium">
+                {isHi ? 'डॉक्टर को वीडियो दिखाने के लिए यहाँ टैप करें' : 'Tap to allow camera access on your mobile device'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onStartMedia}
+            className="px-3.5 py-2 bg-neutral-950 hover:bg-neutral-900 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 shrink-0"
+          >
+            {isHi ? 'चालू करें' : 'Enable Camera'}
+          </button>
+        </div>
+      )}
+
       {/* Camera / Permission Alert */}
       {cameraError && (
         <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-start gap-2 shadow-2xs">
@@ -167,6 +194,7 @@ export default function CallInterface({
           peerName={doctor?.name || 'Dr. Ananya Sharma, MBBS, MD'}
           rtt={rtt}
           onReconnect={onReconnect}
+          relayFrame={relayFrame}
         />
 
         {/* Self Mini Tile */}

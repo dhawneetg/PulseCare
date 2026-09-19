@@ -11,6 +11,7 @@ export default function VideoPlayer({
   isMuted = false,
   onStartMedia = null,
   onReconnect = null,
+  relayFrame = null,
 }) {
   const videoRef = useRef(null);
   const [playBlocked, setPlayBlocked] = useState(false);
@@ -196,8 +197,25 @@ export default function VideoPlayer({
         </div>
       )}
 
+      {/* Low-Bandwidth Live Relay Image Surface (Active when WebRTC P2P is blocked or connecting) */}
+      {!isLocal && !isDisplayingRealVideo && relayFrame && !isAudioOnly && (
+        <div className="absolute inset-0 z-10 bg-black flex items-center justify-center overflow-hidden">
+          <img
+            src={relayFrame}
+            alt="Remote Telehealth Feed"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute bottom-3 left-3 z-20">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/90 text-emerald-300 border border-emerald-500/50 text-[11px] font-bold shadow-md">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Low-Bandwidth Adaptive Relay</span>
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Interactive Live Doctor Tele-Consultation Studio (When awaiting remote peer or testing on 1 device) */}
-      {!isLocal && !isDisplayingRealVideo && !isAudioOnly && (
+      {!isLocal && !isDisplayingRealVideo && !relayFrame && !isAudioOnly && (
         <div className="absolute inset-0 bg-gradient-to-b from-[#0a1f1c] via-[#081816] to-[#040d0c] flex flex-col justify-between p-4 sm:p-5 text-white select-none z-10">
           {/* Top Telehealth Status Bar */}
           <div className="flex items-center justify-between">
