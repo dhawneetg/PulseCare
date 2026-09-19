@@ -17,6 +17,9 @@ import EmergencyTextRelay from './components/common/EmergencyTextRelay.jsx';
 import IncomingCallModal from './components/common/IncomingCallModal.jsx';
 import AmbulanceDispatchModal from './components/doctor/AmbulanceDispatchModal.jsx';
 import SmsUssdGatewayModal from './components/common/SmsUssdGatewayModal.jsx';
+import ClinicalDatabaseModal from './components/database/ClinicalDatabaseModal.jsx';
+import DoctorLoginModal from './components/doctor/DoctorLoginModal.jsx';
+import ClinicalPhotoPacketizer from './components/common/ClinicalPhotoPacketizer.jsx';
 import { playIncomingRingtone, stopIncomingRingtone } from './utils/audioChime.js';
 import { MOCK_PATIENTS, MOCK_PRESCRIPTIONS, MOCK_DOCTOR } from './utils/mockData.js';
 
@@ -29,14 +32,28 @@ export default function App() {
     return 'home';
   });
 
-  // Global Language state ('en' | 'hi')
+  // Global Language state ('en' | 'hi' | 'bn')
   const [lang, setLang] = useState('en');
-  const toggleLang = () => setLang((prev) => (prev === 'en' ? 'hi' : 'en'));
+  const cycleLang = () => {
+    setLang((prev) => {
+      if (prev === 'en') return 'hi';
+      if (prev === 'hi') return 'bn';
+      return 'en';
+    });
+  };
 
   // In-memory queue of patients (initialized with mock data per PRD Section 5)
   const [patients, setPatients] = useState(MOCK_PATIENTS);
   const [selectedPatient, setSelectedPatient] = useState(MOCK_PATIENTS[0]);
   const [activePrescriptions, setActivePrescriptions] = useState(MOCK_PRESCRIPTIONS);
+
+  // New Clinical Database, Doctor Login, and 2G Clinical Photo States
+  const [showDatabaseModal, setShowDatabaseModal] = useState(false);
+  const [showDoctorLoginModal, setShowDoctorLoginModal] = useState(false);
+  const [showClinicalPhotoModal, setShowClinicalPhotoModal] = useState(false);
+  const [currentDoctor, setCurrentDoctor] = useState(MOCK_DOCTOR);
+  const [incomingImageStream, setIncomingImageStream] = useState(null);
+  const packetBuffersRef = useRef({});
 
   // Patient view state
   const [patientQueueState, setPatientQueueState] = useState(null); // null = filling questionnaire, object = in queue/call
@@ -196,6 +213,9 @@ export default function App() {
     onVideoFrame: ({ frame }) => {
       setRemoteRelayFrame(frame);
     },
+    onImagePacket: ({ packet }) => {
+      handleIncomingImagePacket(packet);
+    },
     onCallEnded: ({ reason } = {}) => {
       console.log('[PulseCare] Remote peer ended consultation:', reason || 'Disconnected');
       stopIncomingRingtone();
@@ -209,6 +229,50 @@ export default function App() {
     },
   });
   signalingRef.current = signaling;
+
+  // Handle incoming 2G packet chunks
+  const handleIncomingImagePacket = (packet) => {
+    if (!packet || !packet.imageId) return;
+    const { imageId, title, index, totalChunks, chunk } = packet;
+
+    if (!packetBuffersRef.current[imageId]) {
+      packetBuffersRef.current[imageId] = {
+        title,
+        chunks: new Array(totalChunks).fill(null),
+        received: 0,
+        totalChunks
+      };
+    }
+
+    const buf = packetBuffersRef.current[imageId];
+    if (!buf.chunks[index]) {
+      buf.chunks[index] = chunk;
+      buf.received++;
+    }
+
+    const progress = Math.round((buf.received / totalChunks) * 100);
+
+    if (buf.received >= totalChunks) {
+      const fullDataUrl = buf.chunks.join('');
+      setIncomingImageStream({
+        imageId,
+        title,
+        progress: 100,
+        dataUrl: fullDataUrl,
+        complete: true
+      });
+      setShowClinicalPhotoModal(true);
+    } else {
+      setIncomingImageStream({
+        imageId,
+        title,
+        progress,
+        received: buf.received,
+        total: totalChunks,
+        complete: false
+      });
+    }
+  };
 
   // Stream local audio chunks over Socket.io as low-bandwidth fallback (bypasses NAT / carrier firewalls)
   useEffect(() => {
@@ -485,15 +549,22 @@ export default function App() {
         networkStatus={networkStatus}
         rtt={simulatedRtt}
         lang={lang}
-        onToggleLang={toggleLang}
+        onCycleLang={cycleLang}
         onOpenSmsUssd={() => setShowSmsUssdModal(true)}
+        onOpenDatabase={() => setShowDatabaseModal(true)}
+        onOpenDoctorLogin={() => setShowDoctorLoginModal(true)}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col">
         {/* ROUTE 1: HOME LANDING PAGE */}
         {currentRoute === 'home' && (
-          <LandingPage onNavigate={navigateTo} />
+          <LandingPage 
+            onNavigate={navigateTo} 
+            lang={lang}
+            onOpenDatabase={() => setShowDatabaseModal(true)}
+            onOpenDoctorLogin={() => setShowDoctorLoginModal(true)}
+          />
         )}
 
         {/* ROUTE 2: PATIENT VIEW */}
@@ -503,7 +574,7 @@ export default function App() {
               <CallInterface
                 patientData={patientQueueState}
                 isInCall={isPatientInCall}
-                doctor={MOCK_DOCTOR}
+                doctor={currentDoctor}
                 localStream={webrtc.localStream}
                 remoteStream={webrtc.remoteStream}
                 isAudioOnly={networkStatus === 'degraded'}
@@ -527,6 +598,7 @@ export default function App() {
                 isChatOpen={isChatOpen}
                 onToggleChat={() => setIsChatOpen(!isChatOpen)}
                 onReconnect={handleReconnectConsultation}
+                onOpenClinicalPhoto={() => setShowClinicalPhotoModal(true)}
                 relayFrame={remoteRelayFrame}
                 lang={lang}
               />
@@ -543,6 +615,9 @@ export default function App() {
             <CommandHeaderMetrics 
               queueCount={patients.length} 
               onDispatch108={() => setShowDispatchModal(true)}
+              onOpenDatabase={() => setShowDatabaseModal(true)}
+              onOpenDoctorLogin={() => setShowDoctorLoginModal(true)}
+              lang={lang}
             />
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 min-h-[calc(100vh-8rem)]">
@@ -583,7 +658,7 @@ export default function App() {
                         stream={webrtc.localStream}
                         isLocal={true}
                         isAudioOnly={isVideoDisabled}
-                        peerName="Dr. Ananya Sharma"
+                        peerName={currentDoctor?.name || "Dr. Ananya Sharma"}
                         onStartMedia={webrtc.startLocalMedia}
                       />
                     </div>
@@ -602,6 +677,7 @@ export default function App() {
                       isChatOpen={isChatOpen}
                       onToggleChat={() => setIsChatOpen(!isChatOpen)}
                       onReconnect={handleReconnectConsultation}
+                      onOpenClinicalPhoto={() => setShowClinicalPhotoModal(true)}
                       lang={lang}
                     />
 
@@ -645,6 +721,34 @@ export default function App() {
         )}
       </main>
 
+      {/* 2G Clinical Photo Stream Notification Toast */}
+      {incomingImageStream && (
+        <div className="fixed bottom-6 right-6 z-40 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl border border-amber-400/40 max-w-sm animate-in slide-in-from-bottom-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                <span>2G Clinical Packet Relay Active</span>
+              </div>
+              <p className="text-sm font-bold text-white mt-1">
+                {incomingImageStream.title || 'Clinical Photo'}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {incomingImageStream.complete 
+                  ? '✅ 100% Reassembled via 2G Packets' 
+                  : `Receiving: ${incomingImageStream.progress}% (${incomingImageStream.received}/${incomingImageStream.total} packets)`}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowClinicalPhotoModal(true)}
+              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 shadow-sm"
+            >
+              {incomingImageStream.complete ? 'Inspect Photo' : 'View Stream'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Global Incoming Doctor Consultation Banner & Ringtone Modal */}
       <IncomingCallModal
         incomingCall={incomingCall}
@@ -665,6 +769,39 @@ export default function App() {
       <SmsUssdGatewayModal
         isOpen={showSmsUssdModal}
         onClose={() => setShowSmsUssdModal(false)}
+        lang={lang}
+      />
+
+      {/* Clinical Relational Database Modal (Doctors & Applied Patients Registry Table) */}
+      <ClinicalDatabaseModal
+        isOpen={showDatabaseModal}
+        onClose={() => setShowDatabaseModal(false)}
+        patients={patients}
+        onSelectPatientForCall={(p) => {
+          setSelectedPatient(p);
+          if (currentRoute !== 'doctor') navigateTo('doctor');
+        }}
+        lang={lang}
+      />
+
+      {/* Doctor Council Credentials Verification & Login Modal */}
+      <DoctorLoginModal
+        isOpen={showDoctorLoginModal}
+        onClose={() => setShowDoctorLoginModal(false)}
+        currentDoctor={currentDoctor}
+        onLoginSuccess={(updatedDoc) => setCurrentDoctor(updatedDoc)}
+        lang={lang}
+      />
+
+      {/* 2G High-Res Clinical Photo Packetizer Modal */}
+      <ClinicalPhotoPacketizer
+        isOpen={showClinicalPhotoModal}
+        onClose={() => setShowClinicalPhotoModal(false)}
+        roomId={activeRoomId}
+        onSendPacket={(rId, packet) => {
+          signalingRef.current?.sendImagePacket(rId, packet);
+        }}
+        incomingPackets={incomingImageStream}
         lang={lang}
       />
     </div>

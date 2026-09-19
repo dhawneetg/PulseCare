@@ -15,14 +15,20 @@ import {
   Lock
 } from 'lucide-react';
 
-export function CommandHeaderMetrics({ queueCount = 18, onDispatch108 }) {
+export function CommandHeaderMetrics({ 
+  queueCount = 18, 
+  onDispatch108, 
+  onOpenDatabase, 
+  onOpenDoctorLogin, 
+  lang = 'en' 
+}) {
   return (
     <div className="w-full bg-white rounded-2xl p-4 sm:p-5 border border-neutral-200 shadow-sm space-y-4 text-left">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-3">
         <div className="flex items-center gap-2.5">
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
-              <span>District Hub Consultation & Tele-Queue Command</span>
+              <span>{lang === 'hi' ? 'जिला टेली-हब परामर्श एवं ट्राइएज कमान' : 'District Hub Consultation & Tele-Queue Command'}</span>
             </h1>
             <p className="text-xs text-neutral-500 font-medium">
               District Hospital Hub 3 • Low-Bandwidth Triage & Consultation Gateway
@@ -30,7 +36,31 @@ export function CommandHeaderMetrics({ queueCount = 18, onDispatch108 }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {onOpenDatabase && (
+            <button
+              type="button"
+              onClick={onOpenDatabase}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold transition-all shadow-2xs"
+              title="Open Doctors List & Applied Patients Tabular Database"
+            >
+              <Database className="w-4 h-4 text-brand-marigold" />
+              <span>{lang === 'hi' ? 'टेबल डेटाबेस' : 'Clinical Table DB'}</span>
+            </button>
+          )}
+
+          {onOpenDoctorLogin && (
+            <button
+              type="button"
+              onClick={onOpenDoctorLogin}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-300 text-xs font-bold transition-all shadow-2xs"
+              title="Verify Medical Registration Council Credentials"
+            >
+              <ShieldCheck className="w-4 h-4 text-teal-600" />
+              <span>{lang === 'hi' ? 'NMC डॉक्टर लॉगिन' : 'NMC Doctor Login'}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onDispatch108}
@@ -39,10 +69,6 @@ export function CommandHeaderMetrics({ queueCount = 18, onDispatch108 }) {
             <Ambulance className="w-4 h-4 animate-pulse" />
             <span>108 EMS Dispatch</span>
           </button>
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-teal/10 text-brand-teal text-xs font-bold border border-brand-teal/20">
-            <Radio className="w-3.5 h-3.5" />
-            <span>Low-Bandwidth Mode: Auto Fallback ON</span>
-          </span>
         </div>
       </div>
 

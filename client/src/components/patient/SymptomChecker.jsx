@@ -464,14 +464,25 @@ export default function SymptomChecker({ onJoinQueue, lang = 'en' }) {
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => setPatientData({
-                  name: 'Ramesh Kumar',
-                  age: '45',
-                  village: 'Rampur Village Block B',
-                  vitals: { temp: '99.2', bp: '120/80', pulse: '76', spo2: '98' },
-                  symptoms: [isHi ? 'तेज़ बुखार / तपन' : 'Fever / High Temperature', isHi ? 'खांसी / गले में खराश' : 'Cough / Sore Throat'],
-                  customSymptom: '',
-                })}
+                onClick={() => {
+                  setPatientData({
+                    name: 'Ramesh Kumar',
+                    age: '45',
+                    village: 'Rampur Village Block B',
+                    vitals: { temp: '99.2', bp: '120/80', pulse: '76', spo2: '98' },
+                    symptoms: [isHi ? 'तेज़ बुखार / तपन' : 'Fever / High Temperature', isHi ? 'खांसी / गले में खराश' : 'Cough / Sore Throat'],
+                    customSymptom: '',
+                  });
+                  setAbhaId('91-4821-3091-7712');
+                  setAbhaVerified(true);
+                  setAbhaRecord({
+                    abhaNumber: '91-4821-3091-7712',
+                    patientName: 'Ramesh Kumar',
+                    bloodGroup: 'B+ (Positive)',
+                    linkedPhc: 'Rampur Community Health Centre',
+                    pmjayCoverage: 'Eligible (₹5 Lakh Shield Active)'
+                  });
+                }}
                 className="text-xs font-semibold text-brand-teal hover:underline flex items-center gap-1"
               >
                 <Sparkles className="w-3.5 h-3.5" />

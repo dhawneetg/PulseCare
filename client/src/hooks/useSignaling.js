@@ -44,6 +44,7 @@ export function useSignaling({
       onPeerJoined,
       onAudioChunk,
       onVideoFrame,
+      onImagePacket,
     };
   });
 
@@ -104,6 +105,10 @@ export function useSignaling({
 
     socket.on('video-frame', (data) => {
       callbacksRef.current.onVideoFrame?.(data);
+    });
+
+    socket.on('image-packet', (data) => {
+      callbacksRef.current.onImagePacket?.(data);
     });
 
     return () => {
@@ -171,6 +176,12 @@ export function useSignaling({
     }
   }, []);
 
+  const sendImagePacket = useCallback((roomId, packet) => {
+    if (socketRef.current?.connected && roomId && packet) {
+      socketRef.current.emit('image-packet', { roomId, packet });
+    }
+  }, []);
+
   const endCallSignaling = useCallback((roomId) => {
     if (socketRef.current?.connected && roomId) {
       socketRef.current.emit(SOCKET_EVENTS.CALL_ENDED, { roomId });
@@ -191,6 +202,7 @@ export function useSignaling({
     sendTextRelay,
     sendAudioChunk,
     sendVideoFrame,
+    sendImagePacket,
     endCallSignaling,
   };
 }

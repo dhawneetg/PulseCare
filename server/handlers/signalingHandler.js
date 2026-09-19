@@ -143,6 +143,18 @@ export function setupSignalingHandlers(io, socket) {
       });
     }
   });
+
+  // Low-bandwidth clinical photo packet chunk relay (2G Packet Streamer for Rashes/Tongue/Wounds)
+  socket.on('image-packet', ({ roomId, packet }) => {
+    if (roomId && packet) {
+      socket.join(roomId);
+      socket.to(roomId).emit('image-packet', {
+        packet,
+        roomId,
+        from: socket.id
+      });
+    }
+  });
 }
 
 

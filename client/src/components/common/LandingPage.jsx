@@ -28,8 +28,11 @@ import {
   Eye,
   Server
 } from 'lucide-react';
+import { TRANSLATIONS } from '../../utils/translations.js';
 
-export default function LandingPage({ onNavigate }) {
+export default function LandingPage({ onNavigate, lang = 'en', onOpenDatabase, onOpenDoctorLogin }) {
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+
   // Interactive Network Simulator State for Hackathon Judges
   const [simulatorMode, setSimulatorMode] = useState('2g'); // '4g' | '3g' | '2g' | 'blackout'
 
@@ -40,9 +43,9 @@ export default function LandingPage({ onNavigate }) {
       rtt: '38 ms',
       videoStatus: '720p HD @ 30 FPS',
       audioCodec: 'Opus Full-Band 48 kHz',
-      behavior: 'Nominal bidirectional video and crystal-clear clinical audio.',
+      behavior: lang === 'hi' ? 'उच्च गति पर स्पष्ट दो-तरफ़ा वीडियो और ऑडियो परामर्श।' : 'Nominal bidirectional video and crystal-clear clinical audio.',
       tagColor: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-      badge: 'Optimal Connection',
+      badge: lang === 'hi' ? 'उत्तम कनेक्शन' : 'Optimal Connection',
       videoActive: true,
       audioActive: true,
     },
@@ -52,9 +55,9 @@ export default function LandingPage({ onNavigate }) {
       rtt: '185 ms',
       videoStatus: '240p Adaptive @ 15 FPS',
       audioCodec: 'Opus Wide-Band 24 kHz',
-      behavior: 'Dynamic frame-rate scaling active. Media resolution compressed to conserve packet budget.',
+      behavior: lang === 'hi' ? 'सीमित बैंडविड्थ में वीडियो फ्रेम रेट संकुचित किया गया।' : 'Dynamic frame-rate scaling active. Media resolution compressed to conserve packet budget.',
       tagColor: 'bg-amber-50 text-amber-800 border-amber-200',
-      badge: 'Bandwidth Constrained',
+      badge: lang === 'hi' ? 'मध्यम बैंडविड्थ' : 'Bandwidth Constrained',
       videoActive: true,
       audioActive: true,
     },
@@ -62,23 +65,23 @@ export default function LandingPage({ onNavigate }) {
       label: '2G EDGE (<40 kbps)',
       bandwidth: '28 kbps',
       rtt: '580 ms',
-      videoStatus: 'Video Suspended (Audio Guard)',
+      videoStatus: lang === 'hi' ? 'वीडियो बंद (ऑडियो सुरक्षा)' : 'Video Suspended (Audio Guard)',
       audioCodec: 'Opus Narrow-Band 12 kbps',
-      behavior: 'RTT exceeded 500ms cliff. Video paused automatically to protect uninterrupted medical voice stream.',
+      behavior: lang === 'hi' ? 'लेटेंसी 500ms से अधिक होने पर वीडियो स्वतः बंद होकर निर्बाध आवाज़ चालू रहती है।' : 'RTT exceeded 500ms cliff. Video paused automatically to protect uninterrupted medical voice stream.',
       tagColor: 'bg-rose-50 text-rose-800 border-rose-200',
-      badge: 'Adaptive Degradation Active',
+      badge: lang === 'hi' ? 'एडेप्टिव ऑडियो फॉलबैक' : 'Adaptive Degradation Active',
       videoActive: false,
       audioActive: true,
     },
     'blackout': {
-      label: 'Cellular Blackout',
+      label: lang === 'hi' ? 'सेलुलर ब्लैकआउट (शून्य नेटवर्क)' : 'Cellular Blackout',
       bandwidth: '0 kbps',
       rtt: 'Disconnected',
-      videoStatus: 'Offline Mode Engaged',
+      videoStatus: lang === 'hi' ? 'ऑफलाइन मोड सक्रिय' : 'Offline Mode Engaged',
       audioCodec: 'Local Audio Memo Cache',
-      behavior: 'Zero connectivity. Offline deterministic triage engine continues running in local encrypted storage.',
+      behavior: lang === 'hi' ? 'बिना इंटरनेट लोकल स्टोरेज पर नियम-आधारित ट्राइएज इंजन कार्यरत।' : 'Zero connectivity. Offline deterministic triage engine continues running in local encrypted storage.',
       tagColor: 'bg-slate-100 text-slate-800 border-slate-300',
-      badge: '100% Offline Operation',
+      badge: lang === 'hi' ? '100% ऑफलाइन संचालन' : '100% Offline Operation',
       videoActive: false,
       audioActive: false,
     }
@@ -105,37 +108,47 @@ export default function LandingPage({ onNavigate }) {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-500 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-600"></span>
               </span>
-              <span>National Rural Telehealth Protocol</span>
-              <span className="text-teal-300">•</span>
-              <span className="text-teal-800 font-normal">2G/3G WebRTC Resilience</span>
+              <span>{t.heroBadge || 'National Rural Telehealth Protocol • ABDM'}</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 leading-[1.12]">
-              Rural Telemedicine That <span className="text-brand-teal">Never Freezes</span> on Weak Networks.
+              {t.heroTitle || 'Rural Telemedicine That'}{' '}
+              <span className="text-brand-teal">{t.heroHighlight || 'Never Freezes on 2G'}</span>.
             </h1>
 
             <p className="text-base sm:text-lg text-slate-600 leading-relaxed font-normal max-w-2xl">
-              Over 600,000 Indian villages face intermittent 2G/3G connectivity where standard video calls crash. PulseCare automatically drops video frames to preserve crystal-clear two-way audio—supported by a 100% offline deterministic triage engine and doorstep ASHA medicine delivery.
+              {t.heroDesc || 'Over 600,000 Indian villages face intermittent 2G/3G connectivity where standard video calls crash. PulseCare automatically drops video frames to preserve crystal-clear two-way audio—supported by a 100% offline deterministic triage engine and doorstep ASHA medicine delivery.'}
             </p>
 
             {/* Main Action Buttons */}
-            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-wrap">
               <button
                 onClick={() => onNavigate('doctor')}
-                className="h-14 px-8 rounded-xl bg-brand-tealDark hover:bg-[#0c2825] text-white font-bold text-sm sm:text-base flex items-center justify-center gap-3 transition-all shadow-md shadow-brand-tealDark/15 hover:scale-[1.01] active:scale-[0.99]"
+                className="h-14 px-7 rounded-xl bg-brand-tealDark hover:bg-[#0c2825] text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2.5 transition-all shadow-md shadow-brand-tealDark/15 hover:scale-[1.01] active:scale-[0.99]"
               >
                 <Stethoscope className="w-5 h-5 text-emerald-300" />
-                <span>Open Doctor Teleconsult Hub</span>
+                <span>{t.openDoctorHubBtn || 'Doctor Tele-Hub'}</span>
                 <ArrowRight className="w-4 h-4 text-neutral-300" />
               </button>
 
               <button
                 onClick={() => onNavigate('patient')}
-                className="h-14 px-7 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-sm sm:text-base flex items-center justify-center gap-2.5 transition-all border border-slate-300 shadow-xs active:scale-[0.99]"
+                className="h-14 px-6 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all border border-slate-300 shadow-xs active:scale-[0.99]"
               >
                 <User className="w-5 h-5 text-brand-teal" />
-                <span>Patient & Village Kiosk</span>
+                <span>{t.startTriageBtn || 'Patient Triage'}</span>
               </button>
+
+              {onOpenDatabase && (
+                <button
+                  onClick={onOpenDatabase}
+                  className="h-14 px-6 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all border-2 border-amber-300 shadow-xs active:scale-[0.99]"
+                  title="View Registered Doctors and Applied Patients Table Database"
+                >
+                  <Database className="w-5 h-5 text-brand-marigold" />
+                  <span>{t.openDatabaseBtn || 'Clinical Database'}</span>
+                </button>
+              )}
             </div>
 
             {/* Core Verification Proof Points */}

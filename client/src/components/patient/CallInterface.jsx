@@ -29,6 +29,7 @@ export default function CallInterface({
   isChatOpen = false,
   onToggleChat,
   onReconnect = null,
+  onOpenClinicalPhoto = null,
   relayFrame = null,
   lang = 'en',
 }) {
@@ -224,6 +225,7 @@ export default function CallInterface({
         isChatOpen={isChatOpen}
         onToggleChat={onToggleChat}
         onReconnect={onReconnect}
+        onOpenClinicalPhoto={onOpenClinicalPhoto}
         lang={lang}
       />
 

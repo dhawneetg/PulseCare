@@ -45,8 +45,8 @@ export default function PrescriptionForm({ patient, onIssuePrescription }) {
     }, 800);
   };
 
-  const handleShareWhatsApp = () => {
-    const text = `📋 *PulseCare Tele-Prescription (जिला टेली-हब 3)*\n` +
+  const getWhatsAppMessageText = () => {
+    return `📋 *PulseCare Tele-Prescription (जिला टेली-हब 3)*\n` +
       `👤 *Patient:* ${patient?.name || 'Sunita Devi'} (${patient?.age || '46'} yrs)\n` +
       `📍 *Village:* ${patient?.village || 'Rampur PHC #04'}\n` +
       `💊 *Medication:* ${formData.medication}\n` +
@@ -54,9 +54,16 @@ export default function PrescriptionForm({ patient, onIssuePrescription }) {
       `👩‍⚕️ *Doctor:* Dr. Ananya Sharma (Reg. #UP-MED-48201)\n` +
       `📦 *ASHA Contact:* ${formData.ashaWorkerName} (${formData.ashaContact})\n` +
       `📝 *Advice:* ${formData.clinicalNotes}\n` +
-      `🔗 *Verify Slip:* https://pulsecare.gov.in/verify/${lastRxId}`;
+      `🔗 *ABDM Telehealth Token:* https://pulsecare.gov.in/verify/${lastRxId}`;
+  };
 
-    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+  const getWhatsAppUrl = () => {
+    const text = getWhatsAppMessageText();
+    return `https://wa.me/?text=${encodeURIComponent(text)}`;
+  };
+
+  const handleShareWhatsApp = () => {
+    const url = getWhatsAppUrl();
     window.open(url, '_blank');
   };
 
@@ -69,15 +76,23 @@ export default function PrescriptionForm({ patient, onIssuePrescription }) {
             Digital Prescription & ASHA Routing
           </h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowWhatsAppQrModal(true)}
+            title="Scan QR to open prescription directly on phone WhatsApp"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-400 flex items-center gap-1.5 transition-all shadow-2xs"
+          >
+            <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Scan WhatsApp QR</span>
+          </button>
           <button
             type="button"
             onClick={handleShareWhatsApp}
-            title="Share Prescription via WhatsApp"
-            className="px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 transition-all"
+            title="Share Prescription via WhatsApp Web"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-700 hover:bg-emerald-50 border border-emerald-200 flex items-center gap-1.5 transition-all"
           >
-            <Share2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>WhatsApp Slip</span>
+            <span>Open Web</span>
           </button>
           <button
             type="button"
@@ -86,7 +101,7 @@ export default function PrescriptionForm({ patient, onIssuePrescription }) {
             className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 flex items-center gap-1.5 transition-all"
           >
             <Printer className="w-3.5 h-3.5 text-slate-700" />
-            <span>Print Slip (QR)</span>
+            <span>Print Slip</span>
           </button>
         </div>
       </div>
@@ -283,12 +298,12 @@ export default function PrescriptionForm({ patient, onIssuePrescription }) {
               <div className="flex items-center justify-between pt-2 border-t border-slate-200 gap-4">
                 <div className="flex items-center gap-3">
                   <QrCodeSvg 
-                    value={`https://pulsecare.gov.in/verify/${lastRxId}?patient=${encodeURIComponent(patient?.name || 'Patient')}`} 
-                    size={76} 
+                    value={getWhatsAppUrl()} 
+                    size={84} 
                   />
-                  <div className="text-[10px] text-slate-500 max-w-[170px] leading-tight">
-                    <p className="font-bold text-slate-700">Scan at Kiosk</p>
-                    <p>Instant digital verification by local ASHA medicine distributor.</p>
+                  <div className="text-[10px] text-slate-500 max-w-[180px] leading-tight">
+                    <p className="font-bold text-slate-800">Scan via Mobile Camera</p>
+                    <p>Instant verification & direct WhatsApp delivery for patient & ASHA.</p>
                   </div>
                 </div>
 
@@ -301,6 +316,56 @@ export default function PrescriptionForm({ patient, onIssuePrescription }) {
                   <p className="text-[10px] text-emerald-700 font-bold">Digitally Signed via PulseCare</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Instant WhatsApp QR Code Scanner Modal for Judges & Mobile Phones */}
+      {showWhatsAppQrModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-neutral-200 overflow-hidden text-center p-6 space-y-4">
+            <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mx-auto">
+              <Share2 className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">
+                Scan via Phone Camera / WhatsApp
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Point any phone camera or Google Lens to instantly open this e-prescription on WhatsApp.
+              </p>
+            </div>
+
+            {/* Scannable WhatsApp QR Code */}
+            <div className="flex justify-center p-2 bg-slate-50 rounded-2xl border border-slate-200">
+              <QrCodeSvg 
+                value={getWhatsAppUrl()} 
+                size={180} 
+              />
+            </div>
+
+            <div className="text-xs font-medium text-slate-600 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 flex items-center justify-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <span>Ready to scan • Opens WhatsApp automatically</span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleShareWhatsApp}
+                className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+              >
+                Open in WhatsApp Web
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowWhatsAppQrModal(false)}
+                className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

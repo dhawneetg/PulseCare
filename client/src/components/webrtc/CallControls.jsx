@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Gauge, MessageSquare, Radio, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Gauge, MessageSquare, Radio, Wifi, WifiOff, RefreshCw, Camera } from 'lucide-react';
 import { TRANSLATIONS } from '../../utils/translations.js';
 
 export default function CallControls({
@@ -16,6 +16,7 @@ export default function CallControls({
   isChatOpen = false,
   onToggleChat = null,
   onReconnect = null,
+  onOpenClinicalPhoto = null,
   unreadCount = 0,
   lang = 'en',
 }) {
@@ -74,6 +75,21 @@ export default function CallControls({
                   {unreadCount}
                 </span>
               )}
+            </button>
+          )}
+
+          {/* 2G Clinical Photo Packet Streamer */}
+          {onOpenClinicalPhoto && (
+            <button
+              type="button"
+              onClick={onOpenClinicalPhoto}
+              className="h-11 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs active:scale-95"
+              title="Stream Clinical Photo (Rash/Tongue/Wound) sliced over 2G packet chunks"
+            >
+              <Camera className="w-4 h-4 text-amber-600" />
+              <span className="hidden xs:inline sm:inline">
+                {lang === 'hi' ? '2G फोटो पैकेट' : '2G Photo Packet'}
+              </span>
             </button>
           )}
         </div>
