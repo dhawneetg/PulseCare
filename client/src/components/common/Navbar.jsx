@@ -9,25 +9,12 @@ export default function Navbar({
   networkStatus = 'stable',
   rtt = null,
   lang = 'en',
-  onCycleLang,
+  onToggleLang,
   onOpenSmsUssd,
   onOpenDatabase,
   onOpenDoctorLogin,
 }) {
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
-
-  const getNextLangLabel = () => {
-    if (lang === 'en') return 'हिन्दी';
-    if (lang === 'hi') return 'বাংলা';
-    return 'English';
-  };
-
-  const getCurrentLangBadge = () => {
-    if (lang === 'en') return 'EN';
-    if (lang === 'hi') return 'हिन्दी';
-    if (lang === 'bn') return 'বাংলা';
-    return 'EN';
-  };
 
   return (
     <header className="bg-brand-tealDark text-white shadow-sm sticky top-0 z-50 w-full max-w-full overflow-hidden">
@@ -94,17 +81,16 @@ export default function Navbar({
             </button>
           )}
 
-          {/* Multilingual Switcher (English, Hindi, Bengali Regional) */}
-          {onCycleLang && (
+          {/* Multilingual Switcher: English ⇄ हिन्दी */}
+          {onToggleLang && (
             <button
               type="button"
-              onClick={onCycleLang}
+              onClick={onToggleLang}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/40 hover:bg-black/60 border border-amber-400/30 text-xs font-bold text-amber-300 transition-all shadow-2xs shrink-0"
-              title={`Active: ${getCurrentLangBadge()}. Click to switch to ${getNextLangLabel()}`}
+              title={lang === 'hi' ? 'Switch to English' : 'हिन्दी में बदलें'}
             >
               <Globe className="w-3.5 h-3.5 text-amber-400" />
-              <span>{getCurrentLangBadge()}</span>
-              <span className="text-[10px] text-amber-200/70 font-normal">({getNextLangLabel()})</span>
+              <span>{lang === 'hi' ? 'English' : 'हिन्दी'}</span>
             </button>
           )}
 

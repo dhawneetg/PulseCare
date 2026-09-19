@@ -32,15 +32,9 @@ export default function App() {
     return 'home';
   });
 
-  // Global Language state ('en' | 'hi' | 'bn')
+  // Global Language state ('en' | 'hi')
   const [lang, setLang] = useState('en');
-  const cycleLang = () => {
-    setLang((prev) => {
-      if (prev === 'en') return 'hi';
-      if (prev === 'hi') return 'bn';
-      return 'en';
-    });
-  };
+  const toggleLang = () => setLang((prev) => (prev === 'en' ? 'hi' : 'en'));
 
   // In-memory queue of patients (initialized with mock data per PRD Section 5)
   const [patients, setPatients] = useState(MOCK_PATIENTS);
@@ -549,7 +543,7 @@ export default function App() {
         networkStatus={networkStatus}
         rtt={simulatedRtt}
         lang={lang}
-        onCycleLang={cycleLang}
+        onToggleLang={toggleLang}
         onOpenSmsUssd={() => setShowSmsUssdModal(true)}
         onOpenDatabase={() => setShowDatabaseModal(true)}
         onOpenDoctorLogin={() => setShowDoctorLoginModal(true)}

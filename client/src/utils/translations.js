@@ -1,7 +1,6 @@
 /**
  * PulseCare Localization Dictionary
- * Multilingual English, Hindi (हिन्दी), and Bengali (বাংলা - Regional) support
- * for rural, tribal, and district healthcare delivery across India.
+ * Bilingual English & Hindi (हिन्दी) support for rural and tribal healthcare delivery.
  */
 
 export const TRANSLATIONS = {
@@ -249,90 +248,5 @@ export const TRANSLATIONS = {
     toggleChat: 'टेक्स्ट संदेश',
     testNetwork: 'नेटवर्क टेस्ट:',
     clinicalPhoto2G: '2G फोटो पैकेट',
-  },
-
-  bn: {
-    // Navigation (Regional: Bengali)
-    appTitle: 'পালসকেয়ার',
-    subtitle: 'গ্রামীণ টেলিহেলথ',
-    tagline: 'স্বল্প-ব্যান্ডউইথ অভিযোজিত টেলিমেডিসিন',
-    navHome: 'হোম',
-    navPatient: 'রোগী ট্রায়াজ',
-    navDoctor: 'ডাক্তার হাব',
-    navAsha: 'আশা ওয়ার্কলোড',
-    navDatabase: 'ক্লিনিক্যাল ডাটাবেস',
-    language: 'ভাষা / Language',
-
-    // Landing Page
-    heroBadge: 'ভারত সরকার • আয়ুষ্মান ভারত ডিজিটাল মিশন (ABDM)',
-    heroTitle: 'দূরবর্তী গ্রামে জীবনরক্ষাকারী টেলিমেডিসিন',
-    heroHighlight: '২জি (2G) মোবাইল নেটওয়ার্কে',
-    heroDesc: 'পালসকেয়ার অতি দুর্বল ২জি নেটওয়ার্কে নিরবচ্ছিন্ন অডিও পরামর্শ, অফলাইন ট্রায়াজ এবং আশা কর্মীদের মাধ্যমে ঘরে ওষুধ পৌঁছে দেয়।',
-    startTriageBtn: 'রোগী নিবন্ধন ও লক্ষণ পরীক্ষা',
-    openDoctorHubBtn: 'ডাক্তার টেলি-হাব খুলুন',
-    openDatabaseBtn: 'ক্লিনিক্যাল টেবিল ডাটাবেস দেখুন',
-    doctorLoginBtn: 'ডাক্তার NMC লগইন',
-
-    // Network & Status
-    statusStable: '৪জি স্থিতিশীল',
-    statusDegraded: '২জি অডিও ফলব্যাক',
-    statusOffline: 'অফলাইন ক্যাশ',
-    tapToPlay: 'ভিডিও ও অডিও শুরু করতে ট্যাপ করুন',
-    awaitingConnection: 'ডাক্তারের সাথে সংযোগ স্থাপন হচ্ছে...',
-    voiceActive: 'ভয়েস সক্রিয় (অডিও ফলব্যাক)',
-    highLatencyAlert: 'ধীরগতির ইন্টারনেট পাওয়া গেছে। ভিডিও বন্ধ করে পরিষ্কার অডিও চালু করা হয়েছে।',
-
-    // Symptom Checker & Triage
-    symptomCheckerTitle: 'রোগীর তথ্য ও ট্রায়াজ',
-    symptomCheckerSubtitle: 'গ্রামীণ এলাকার জন্য সম্পূর্ণ অফলাইন স্বাস্থ্য পরীক্ষা ব্যবস্থা।',
-    step1: 'প্রোফাইল',
-    step2: 'লক্ষণ',
-    step3: 'ট্রায়াজ সিদ্ধান্ত',
-    fullName: 'রোগীর পুরো নাম *',
-    age: 'বয়স (বছর) *',
-    village: 'গ্রাম / ব্লকের নাম *',
-    autofillDemo: 'ডেমো রোগী পূরণ করুন',
-    proceedToSymptoms: 'লক্ষণ পরীক্ষার দিকে এগোন',
-
-    // Common Symptoms
-    symptomFever: 'তীব্র জ্বর / উচ্চ তাপমাত্রা',
-    symptomCough: 'কাশি / গলা ব্যথা',
-    symptomBodyAche: 'শরীর ব্যথা / ক্লান্তি',
-    symptomHeadache: 'মাথাব্যথা',
-    symptomChestPain: 'বুকে ব্যথা / চাপ (জরুরি)',
-    symptomBreathing: 'শ্বাসকষ্ট (জরুরি)',
-    symptomVomiting: 'বমি / পাতলা পায়খানা',
-    symptomJointPain: 'হাঁটু ও জয়েন্টে ব্যথা',
-
-    // Triage Results
-    emergencyTitle: 'অবিলম্বে হাসপাতালে যাওয়া প্রয়োজন',
-    emergencyDesc: 'গুরুতর লক্ষণ দেখা গেছে। অবিলম্বে নিকটস্থ স্বাস্থ্যকেন্দ্রে যোগাযোগ করুন।',
-    emergencyAction: 'জরুরি অবস্থা — সরাসরি হাসপাতালে যান',
-    consultationTitle: 'অনলাইন ডাক্তার পরামর্শের সুপারিশ',
-    consultationDesc: 'আপনার লক্ষণগুলো টেলিমেডিসিনের মাধ্যমে মূল্যায়ন সম্ভব। ডাক্তারের সাথে যুক্ত করা হচ্ছে।',
-    consultationAction: 'ডাক্তার পরামর্শ সারিতে যুক্ত হন',
-    queueWaiting: 'অনলাইন ডাক্তারের জন্য অপেক্ষা করা হচ্ছে...',
-
-    // Text Relay
-    textRelayTitle: 'জরুরি লো-ব্যান্ডউইথ টেক্সট বার্তা',
-    textRelayNotice: 'ভিডিও ব্যাহত হলেও জরুরি টেক্সট বার্তা নিরবচ্ছিন্ন কাজ করবে।',
-    dataChannelOpen: 'নিরাপদ চ্যানেল সক্রিয়',
-    textPlaceholder: 'বার্তা লিখুন...',
-    send: 'পাঠান',
-    quickChips: 'দ্রুত বার্তা:',
-
-    // Doctor Text Templates
-    docTemplate1: 'প্যারাসিটামল ৫০০ মিগ্রা খাবারের পর ৩ দিন খাবেন।',
-    docTemplate2: 'ওআরএস (ORS) স্যালাইন ও প্রচুর জল পান করুন।',
-    docTemplate3: 'গ্রামের আশা কর্মী পূজা দেবীকে জানানো হয়েছে।',
-    docTemplate4: 'জরুরি ১০৮ অ্যাম্বুলেন্স পাঠানো হচ্ছে।',
-
-    // Call Controls
-    endCall: 'পরামর্শ শেষ করুন',
-    toggleAudio: 'মাইক্রোফোন চালু/বন্ধ',
-    toggleVideo: 'ক্যামেরা চালু/বন্ধ',
-    toggleChat: 'টেক্সট বার্তা',
-    testNetwork: 'নেটওয়ার্ক পরীক্ষা:',
-    clinicalPhoto2G: '২জি ফটো প্যাকেট',
   }
 };
