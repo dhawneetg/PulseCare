@@ -59,7 +59,7 @@ export default function EmergencyTextRelay({
       </div>
 
       {/* Message Feed */}
-      <div className="flex-1 p-3 overflow-y-auto space-y-2 bg-slate-50/50">
+      <div className="flex-1 p-3 overflow-y-auto custom-scrollbar space-y-2 bg-slate-50/50">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 p-4 space-y-1.5">
             <ShieldCheck className="w-8 h-8 text-slate-300" />
