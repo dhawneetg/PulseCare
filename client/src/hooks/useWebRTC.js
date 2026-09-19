@@ -42,14 +42,15 @@ export const ICE_SERVERS = [
 export const MEDIA_CONSTRAINTS = {
   video: {
     facingMode: 'user',
-    width: { ideal: 640 },
-    height: { ideal: 480 },
-    frameRate: { ideal: 24, max: 30 },
+    width: { ideal: 480, max: 640 },
+    height: { ideal: 360, max: 480 },
+    frameRate: { ideal: 18, max: 24 },
   },
   audio: {
     echoCancellation: true,
     noiseSuppression: true,
     autoGainControl: true,
+    channelCount: 1,
   },
 };
 
@@ -82,6 +83,7 @@ export function useWebRTC({
   const dataChannelRef = useRef(null);
   const statsIntervalRef = useRef(null);
   const roomIdRef = useRef(null);
+  const remoteStreamRef = useRef(null);
   const iceCandidateQueueRef = useRef([]);
   const localIceCandidatesRef = useRef([]);
 
@@ -417,17 +419,38 @@ export function useWebRTC({
       console.warn('[PulseCare] Transceiver setup note:', e);
     }
 
-    // Handle remote track reception (robust to single-track or multi-stream events)
+    const remoteMedia = new MediaStream();
+    remoteStreamRef.current = remoteMedia;
+
+    // Handle remote track reception (accumulate BOTH audio & video into remoteMedia)
     pc.ontrack = (event) => {
-      console.log('[PulseCare] Remote track received:', event.track.kind, 'readyState:', event.track.readyState);
-      if (event.streams && event.streams[0]) {
-        setRemoteStream(event.streams[0]);
-        if (onRemoteStream) onRemoteStream(event.streams[0]);
-      } else {
-        const fallbackStream = new MediaStream([event.track]);
-        setRemoteStream(fallbackStream);
-        if (onRemoteStream) onRemoteStream(fallbackStream);
+      console.log('[PulseCare] Remote track received:', event.track.kind, event.track.id, 'readyState:', event.track.readyState);
+      
+      event.track.enabled = true;
+
+      // Add to persistent remote stream
+      const currentTracks = remoteMedia.getTracks();
+      const existingOfSameKind = currentTracks.find(t => t.kind === event.track.kind);
+      if (existingOfSameKind && existingOfSameKind.id !== event.track.id) {
+        remoteMedia.removeTrack(existingOfSameKind);
       }
+      if (!remoteMedia.getTracks().some(t => t.id === event.track.id)) {
+        remoteMedia.addTrack(event.track);
+      }
+
+      // If event.streams[0] is present, merge all tracks (especially audio)
+      if (event.streams && event.streams[0]) {
+        event.streams[0].getTracks().forEach(t => {
+          t.enabled = true;
+          if (!remoteMedia.getTracks().some(existing => existing.id === t.id)) {
+            remoteMedia.addTrack(t);
+          }
+        });
+      }
+
+      const composite = new MediaStream(remoteMedia.getTracks());
+      setRemoteStream(composite);
+      if (onRemoteStream) onRemoteStream(composite);
     };
 
     // Relay ICE candidates and buffer locally for re-broadcast on reconnect
@@ -440,12 +463,26 @@ export function useWebRTC({
       }
     };
 
-    // Connection lifecycle
+    // Connection lifecycle & video bitrate optimization
     pc.onconnectionstatechange = () => {
       console.log('[PulseCare] RTCPeerConnection state:', pc.connectionState);
       if (pc.connectionState === 'connected') {
         setCallConnected(true);
         startStatsMonitoring();
+
+        // Enforce smooth low-bandwidth encoding parameters to prevent video lag & buffer bloat
+        pc.getSenders().forEach((sender) => {
+          if (sender.track && sender.track.kind === 'video') {
+            try {
+              const params = sender.getParameters();
+              if (params && params.encodings && params.encodings.length > 0) {
+                params.encodings[0].maxBitrate = 350000; // 350 kbps max for stutter-free video
+                params.encodings[0].maxFramerate = 20;
+                sender.setParameters(params).catch(() => {});
+              }
+            } catch (e) {}
+          }
+        });
       } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
         setCallConnected(false);
         if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
@@ -512,6 +549,19 @@ export function useWebRTC({
     let pc = peerConnectionRef.current;
     if (!pc || pc.signalingState === 'closed' || pc.signalingState !== 'stable') {
       pc = createPeerConnection(roomId);
+    }
+
+    // Explicitly verify local tracks are attached to this peer connection
+    if (stream) {
+      const senders = pc.getSenders();
+      stream.getTracks().forEach((track) => {
+        const sender = senders.find((s) => s.track && s.track.kind === track.kind);
+        if (sender) {
+          sender.replaceTrack(track).catch(() => {});
+        } else {
+          try { pc.addTrack(track, stream); } catch (e) {}
+        }
+      });
     }
 
     // Listen for incoming DataChannel

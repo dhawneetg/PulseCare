@@ -268,71 +268,8 @@ export default function App() {
     }
   };
 
-  // Stream local audio chunks over Socket.io as low-bandwidth fallback (bypasses NAT / carrier firewalls)
-  useEffect(() => {
-    if (!activeRoomId || !webrtc.localStream || isAudioMuted) return;
-    const audioTracks = webrtc.localStream.getAudioTracks();
-    if (audioTracks.length === 0) return;
-
-    let mediaRecorder = null;
-    try {
-      const audioStream = new MediaStream(audioTracks);
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : '';
-
-      mediaRecorder = mimeType ? new MediaRecorder(audioStream, { mimeType }) : new MediaRecorder(audioStream);
-      mediaRecorder.ondataavailable = async (e) => {
-        if (e.data && e.data.size > 0 && activeRoomIdRef.current) {
-          const buffer = await e.data.arrayBuffer();
-          signalingRef.current?.sendAudioChunk(activeRoomIdRef.current, buffer);
-        }
-      };
-      mediaRecorder.start(800); // 800ms chunks for smooth speech
-    } catch (err) {
-      console.warn('[PulseCare] Audio recorder fallback note:', err);
-    }
-
-    return () => {
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        try { mediaRecorder.stop(); } catch (e) {}
-      }
-    };
-  }, [activeRoomId, webrtc.localStream, isAudioMuted]);
-
-  // Stream local video snapshots over Socket.io as adaptive 2G visual fallback (1.5 FPS, ~4KB per frame)
-  useEffect(() => {
-    if (!activeRoomId || !webrtc.localStream || isVideoDisabled) return;
-    const videoTracks = webrtc.localStream.getVideoTracks();
-    if (videoTracks.length === 0) return;
-
-    const offscreenVideo = document.createElement('video');
-    offscreenVideo.muted = true;
-    offscreenVideo.playsInline = true;
-    offscreenVideo.srcObject = webrtc.localStream;
-    offscreenVideo.play().catch(() => {});
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 320;
-    canvas.height = 240;
-    const ctx = canvas.getContext('2d');
-
-    const frameInterval = setInterval(() => {
-      if (!activeRoomIdRef.current) return;
-      if (offscreenVideo.videoWidth > 0) {
-        ctx.drawImage(offscreenVideo, 0, 0, 320, 240);
-        const frameData = canvas.toDataURL('image/jpeg', 0.4);
-        signalingRef.current?.sendVideoFrame(activeRoomIdRef.current, frameData);
-      }
-    }, 700);
-
-    return () => {
-      clearInterval(frameInterval);
-      offscreenVideo.srcObject = null;
-    };
-  }, [activeRoomId, webrtc.localStream, isVideoDisabled]);
+  // Note: Native WebRTC handles all live audio and video via hardware-accelerated SRTP.
+  // Previous canvas snapshot loops and MediaRecorder chunks were freezing the UI thread and saturating WebSockets.
 
   const handleReconnectConsultation = async () => {
     if (activeRoomId) {

@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
-import { 
-  Database, 
-  Users, 
-  Stethoscope, 
-  Search, 
-  Filter, 
-  Download, 
-  X, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Clock, 
-  ShieldCheck, 
-  Eye, 
+import {
+  Database,
+  Users,
+  Stethoscope,
+  Search,
+  Filter,
+  Download,
+  X,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  ShieldCheck,
+  Eye,
   ExternalLink,
   PhoneCall,
   FileSpreadsheet
@@ -105,17 +105,17 @@ export default function ClinicalDatabaseModal({
 
   // Filter patients
   const filteredPatients = patients.filter(p => {
-    const matchesSearch = 
+    const matchesSearch =
       (p.name && p.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (p.village && p.village.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (p.id && p.id.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (p.symptoms && p.symptoms.some(s => s.toLowerCase().includes(searchQuery.toLowerCase())));
-    
-    const matchesSeverity = 
+
+    const matchesSeverity =
       filterSeverity === 'all' ? true :
-      filterSeverity === 'red' ? (p.priority === 'Red' || p.triageScore >= 80) :
-      filterSeverity === 'yellow' ? (p.priority === 'Yellow' || (p.triageScore >= 40 && p.triageScore < 80)) :
-      (p.priority === 'Green' || p.triageScore < 40);
+        filterSeverity === 'red' ? (p.priority === 'Red' || p.triageScore >= 80) :
+          filterSeverity === 'yellow' ? (p.priority === 'Yellow' || (p.triageScore >= 40 && p.triageScore < 80)) :
+            (p.priority === 'Green' || p.triageScore < 40);
 
     return matchesSearch && matchesSeverity;
   });
@@ -133,7 +133,7 @@ export default function ClinicalDatabaseModal({
   // Export to CSV Functionality
   const handleExportCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
-    
+
     if (activeTab === 'patients') {
       csvContent += "ID,Patient Name,Age,Village,Symptoms,Triage Priority,Score,Status,Applied Time\n";
       filteredPatients.forEach(p => {
@@ -175,8 +175,8 @@ export default function ClinicalDatabaseModal({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                {lang === 'hi' 
-                  ? 'पंजीकृत डॉक्टरों की सूची और कतार में आए मरीज़ों का पूर्ण रिकॉर्ड' 
+                {lang === 'hi'
+                  ? 'पंजीकृत डॉक्टरों की सूची और कतार में आए मरीज़ों का पूर्ण रिकॉर्ड'
                   : 'Relational registry of registered medical officers and triaged rural patients'}
               </p>
             </div>
@@ -206,11 +206,10 @@ export default function ClinicalDatabaseModal({
           <div className="flex items-center gap-2 bg-neutral-200/80 p-1 rounded-xl">
             <button
               onClick={() => setActiveTab('patients')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'patients'
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'patients'
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-neutral-600 hover:text-slate-900'
-              }`}
+                }`}
             >
               <Users className="w-4 h-4 text-emerald-600" />
               <span>{lang === 'hi' ? 'आवेदित मरीज़ (Patients Applied)' : 'Applied Patients Registry'}</span>
@@ -221,11 +220,10 @@ export default function ClinicalDatabaseModal({
 
             <button
               onClick={() => setActiveTab('doctors')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'doctors'
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'doctors'
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-neutral-600 hover:text-slate-900'
-              }`}
+                }`}
             >
               <Stethoscope className="w-4 h-4 text-brand-marigold" />
               <span>{lang === 'hi' ? 'पंजीकृत डॉक्टर सूची (Doctor List)' : 'Registered Doctors Directory'}</span>
@@ -305,17 +303,15 @@ export default function ClinicalDatabaseModal({
                         </div>
                       </td>
                       <td className="p-3">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                          p.priority === 'Red' || p.triageScore >= 80
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${p.priority === 'Red' || p.triageScore >= 80
                             ? 'bg-rose-100 text-rose-800 border border-rose-200'
                             : p.priority === 'Yellow' || p.triageScore >= 40
-                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                            : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            p.priority === 'Red' || p.triageScore >= 80 ? 'bg-rose-600' :
-                            p.priority === 'Yellow' || p.triageScore >= 40 ? 'bg-amber-600' : 'bg-emerald-600'
-                          }`} />
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${p.priority === 'Red' || p.triageScore >= 80 ? 'bg-rose-600' :
+                              p.priority === 'Yellow' || p.triageScore >= 40 ? 'bg-amber-600' : 'bg-emerald-600'
+                            }`} />
                           <span>{p.priority || (p.triageScore >= 80 ? 'Red (High)' : 'Yellow (Medium)')}</span>
                         </span>
                       </td>
@@ -391,17 +387,15 @@ export default function ClinicalDatabaseModal({
                         {doc.hub}
                       </td>
                       <td className="p-3">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          doc.status === 'Online'
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${doc.status === 'Online'
                             ? 'bg-emerald-100 text-emerald-800'
                             : doc.status === 'In-Consult'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-slate-200 text-slate-700'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            doc.status === 'Online' ? 'bg-emerald-600' :
-                            doc.status === 'In-Consult' ? 'bg-amber-600' : 'bg-slate-400'
-                          }`} />
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${doc.status === 'Online' ? 'bg-emerald-600' :
+                              doc.status === 'In-Consult' ? 'bg-amber-600' : 'bg-slate-400'
+                            }`} />
                           <span>{doc.status}</span>
                         </span>
                       </td>

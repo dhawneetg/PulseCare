@@ -14,12 +14,35 @@ export default function VideoPlayer({
   relayFrame = null,
 }) {
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
   const [playBlocked, setPlayBlocked] = useState(false);
   const [useMirrorFeed, setUseMirrorFeed] = useState(false);
   const [hasRealFrames, setHasRealFrames] = useState(false);
 
   // If user toggles mirror testing, use fallbackStream (e.g. localStream)
   const activeStream = useMirrorFeed && fallbackStream ? fallbackStream : stream;
+
+  // Global user gesture listener: any click or touch in the window unlocks audio playback
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (!isLocal && !useMirrorFeed) {
+        if (audioRef.current) {
+          audioRef.current.muted = false;
+          audioRef.current.play().then(() => setPlayBlocked(false)).catch(() => {});
+        }
+        if (videoRef.current) {
+          videoRef.current.muted = false;
+          videoRef.current.play().then(() => setPlayBlocked(false)).catch(() => {});
+        }
+      }
+    };
+    window.addEventListener('click', unlockAudio, { passive: true });
+    window.addEventListener('touchstart', unlockAudio, { passive: true });
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, [isLocal, useMirrorFeed]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -30,6 +53,15 @@ export default function VideoPlayer({
         video.srcObject = activeStream;
       }
       video.muted = !!isLocal || useMirrorFeed;
+
+      // Ensure remote audio element receives audio stream directly
+      if (!isLocal && !useMirrorFeed && audioRef.current) {
+        if (audioRef.current.srcObject !== activeStream) {
+          audioRef.current.srcObject = activeStream;
+        }
+        audioRef.current.muted = false;
+        audioRef.current.play().catch(() => {});
+      }
 
       const checkFrames = () => {
         if (!video) return;
@@ -134,9 +166,18 @@ export default function VideoPlayer({
         webkit-playsinline="true"
         muted={isLocal || useMirrorFeed}
         className={`w-full h-full object-cover ${(isLocal || useMirrorFeed) ? 'scale-x-[-1]' : ''} ${
-          isDisplayingRealVideo && !isAudioOnly ? 'block opacity-100' : 'hidden opacity-0'
+          isDisplayingRealVideo && !isAudioOnly ? 'opacity-100' : 'opacity-0 pointer-events-none absolute inset-0'
         }`}
       />
+
+      {/* Dedicated Remote Audio Channel - Never hidden, guaranteeing continuous two-way microphone playback */}
+      {!isLocal && !useMirrorFeed && (
+        <audio
+          ref={audioRef}
+          autoPlay
+          playsInline
+        />
+      )}
 
       {/* Unmute Audio Pill Overlay (Non-blocking) */}
       {playBlocked && !isLocal && !useMirrorFeed && (
