@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Gauge, MessageSquare, Radio, Wifi, WifiOff } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Gauge, MessageSquare, Radio, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { TRANSLATIONS } from '../../utils/translations.js';
 
 export default function CallControls({
@@ -15,6 +15,7 @@ export default function CallControls({
   isDegraded = false,
   isChatOpen = false,
   onToggleChat = null,
+  onReconnect = null,
   unreadCount = 0,
   lang = 'en',
 }) {
@@ -77,15 +78,29 @@ export default function CallControls({
           )}
         </div>
 
-        {/* Right Group: End Call */}
-        <button
-          type="button"
-          onClick={onEndCall}
-          className="h-11 px-4 sm:px-6 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-sm transition-colors shrink-0"
-        >
-          <PhoneOff className="w-4 h-4" />
-          <span>{t.endCall}</span>
-        </button>
+        {/* Right Group: Re-sync & End Call */}
+        <div className="flex items-center gap-2">
+          {onReconnect && (
+            <button
+              type="button"
+              onClick={onReconnect}
+              className="h-11 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+              title="Re-negotiate WebRTC Stream (Force Refresh)"
+            >
+              <RefreshCw className="w-3.5 h-3.5 animate-spin-slow" />
+              <span className="hidden sm:inline">Re-sync Video</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onEndCall}
+            className="h-11 px-4 sm:px-6 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-sm transition-colors shrink-0"
+          >
+            <PhoneOff className="w-4 h-4" />
+            <span>{t.endCall}</span>
+          </button>
+        </div>
 
       </div>
 

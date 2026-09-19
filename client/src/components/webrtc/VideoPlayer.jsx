@@ -10,6 +10,7 @@ export default function VideoPlayer({
   rtt = null,
   isMuted = false,
   onStartMedia = null,
+  onReconnect = null,
 }) {
   const videoRef = useRef(null);
   const [playBlocked, setPlayBlocked] = useState(false);
@@ -30,10 +31,37 @@ export default function VideoPlayer({
       video.muted = !!isLocal || useMirrorFeed;
 
       const checkFrames = () => {
-        if (video.videoWidth > 0 && video.videoHeight > 0) {
-          setHasRealFrames(true);
+        if (!video) return;
+        const videoTrack = activeStream?.getVideoTracks?.()[0];
+        const isTrackLive = videoTrack && videoTrack.readyState === 'live' && !videoTrack.muted;
+
+        if (isLocal || useMirrorFeed) {
+          if (video.videoWidth > 0 && video.videoHeight > 0) {
+            setHasRealFrames(true);
+          }
+        } else {
+          // For remote stream: verify track is unmuted and packets are rendering
+          if (video.videoWidth > 0 && video.videoHeight > 0 && (isTrackLive || video.currentTime > 0)) {
+            setHasRealFrames(true);
+          } else if (videoTrack && videoTrack.muted) {
+            setHasRealFrames(false);
+          }
         }
       };
+
+      const videoTrack = activeStream.getVideoTracks?.()[0];
+      if (videoTrack) {
+        videoTrack.onunmute = () => {
+          console.log('[PulseCare] Video track unmuted, frames flowing!');
+          checkFrames();
+        };
+        videoTrack.onmute = () => {
+          console.log('[PulseCare] Video track muted, waiting for packets...');
+          if (!isLocal && !useMirrorFeed) {
+            setHasRealFrames(false);
+          }
+        };
+      }
 
       const attemptPlay = () => {
         const playPromise = video.play();
@@ -70,7 +98,7 @@ export default function VideoPlayer({
       video.onplaying = checkFrames;
       video.ontimeupdate = checkFrames;
 
-      // Periodically check if videoWidth became non-zero (WebRTC keyframe arrival)
+      // Periodically check if video dimensions and packets became active
       const frameCheckInterval = setInterval(checkFrames, 500);
       return () => clearInterval(frameCheckInterval);
     } else {
@@ -241,6 +269,31 @@ export default function VideoPlayer({
                 <span className="w-1 bg-emerald-400 rounded-full animate-bounce h-3 delay-100" />
               </div>
             </div>
+
+            {/* Direct Re-connect & Mirror Action Buttons */}
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              {onReconnect && (
+                <button
+                  type="button"
+                  onClick={onReconnect}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-black shadow-lg transition-all active:scale-95"
+                  title="Re-negotiate WebRTC Stream (Force Refresh)"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Re-connect Remote Video (पुनः कनेक्ट करें)</span>
+                </button>
+              )}
+              {fallbackStream && (
+                <button
+                  type="button"
+                  onClick={() => setUseMirrorFeed(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs font-bold shadow-md transition-all active:scale-95 border border-emerald-500/30"
+                  title="Mirror your own webcam in the main screen for 2-way verification"
+                >
+                  <span>Mirror My Camera (कैमरा टेस्ट)</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Bottom Telehealth Security Strip */}
@@ -278,6 +331,17 @@ export default function VideoPlayer({
           }`}>
             RTT: {Math.round(rtt)}ms
           </span>
+        )}
+        {!isLocal && onReconnect && (
+          <button
+            type="button"
+            onClick={onReconnect}
+            className="px-2 py-0.5 rounded text-[10px] font-bold bg-black/60 hover:bg-black/90 text-amber-300 border border-amber-400/40 flex items-center gap-1 transition-all"
+            title="Re-negotiate WebRTC Stream"
+          >
+            <RefreshCw className="w-2.5 h-2.5" />
+            <span>Re-sync</span>
+          </button>
         )}
       </div>
 

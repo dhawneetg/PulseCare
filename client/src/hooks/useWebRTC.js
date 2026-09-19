@@ -3,10 +3,12 @@ import { DATA_CHANNEL_MESSAGES } from '../types/index.js';
 
 // Canonical ICE config per architecture.md Section 3 (STUN + Multi-Port TURN + Secure TLS TURN for mobile carrier traversal)
 export const ICE_SERVERS = [
+  { urls: 'stun:stun.cloudflare.com:3478' },
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun2.l.google.com:19302' },
   { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
   { urls: 'stun:openrelay.metered.ca:80' },
   {
     urls: 'turn:openrelay.metered.ca:80',
@@ -81,6 +83,7 @@ export function useWebRTC({
   const statsIntervalRef = useRef(null);
   const roomIdRef = useRef(null);
   const iceCandidateQueueRef = useRef([]);
+  const localIceCandidatesRef = useRef([]);
 
   /**
    * Acquire local user media with mobile-safe 3-stage fallback and concurrency lock.
@@ -382,6 +385,7 @@ export function useWebRTC({
    */
   const createPeerConnection = useCallback((roomId) => {
     roomIdRef.current = roomId;
+    localIceCandidatesRef.current = [];
     if (peerConnectionRef.current && peerConnectionRef.current.signalingState !== 'closed') {
       try {
         peerConnectionRef.current.close();
@@ -415,7 +419,7 @@ export function useWebRTC({
 
     // Handle remote track reception (robust to single-track or multi-stream events)
     pc.ontrack = (event) => {
-      console.log('[PulseCare] Remote track received:', event.track.kind);
+      console.log('[PulseCare] Remote track received:', event.track.kind, 'readyState:', event.track.readyState);
       if (event.streams && event.streams[0]) {
         setRemoteStream(event.streams[0]);
         if (onRemoteStream) onRemoteStream(event.streams[0]);
@@ -426,10 +430,13 @@ export function useWebRTC({
       }
     };
 
-    // Relay ICE candidates
+    // Relay ICE candidates and buffer locally for re-broadcast on reconnect
     pc.onicecandidate = (event) => {
-      if (event.candidate && onSendIceCandidate) {
-        onSendIceCandidate(event.candidate, roomIdRef.current);
+      if (event.candidate) {
+        localIceCandidatesRef.current.push(event.candidate);
+        if (onSendIceCandidate) {
+          onSendIceCandidate(event.candidate, roomIdRef.current);
+        }
       }
     };
 
@@ -452,16 +459,20 @@ export function useWebRTC({
    * Peer A (Doctor): Initiate Offer & create ui-state-sync DataChannel
    */
   const initiateOffer = useCallback(async (roomId) => {
+    roomIdRef.current = roomId;
     let stream = localStreamRef.current;
     if (!stream) {
       stream = await startLocalMedia();
     }
 
     let pc = peerConnectionRef.current;
-    // Glare protection: If local offer is already pending, re-send it without tearing down the connection
+    // Glare protection: If local offer is already pending, re-send it and re-emit all gathered ICE candidates
     if (pc && pc.signalingState === 'have-local-offer' && pc.localDescription) {
-      console.log('[PulseCare] Re-sending active local offer for room:', roomId);
+      console.log('[PulseCare] Re-sending active local offer & candidates for room:', roomId);
       if (onSendOffer) onSendOffer(pc.localDescription, roomId);
+      localIceCandidatesRef.current.forEach((cand) => {
+        if (onSendIceCandidate) onSendIceCandidate(cand, roomId);
+      });
       return;
     }
 
@@ -486,19 +497,20 @@ export function useWebRTC({
     if (onSendOffer) {
       onSendOffer(offer, roomId);
     }
-  }, [startLocalMedia, createPeerConnection, attachDataChannelListeners, onSendOffer]);
+  }, [startLocalMedia, createPeerConnection, attachDataChannelListeners, onSendOffer, onSendIceCandidate]);
 
   /**
    * Peer B (Patient): Receive Offer, create Answer, and listen for DataChannel
    */
   const handleReceiveOffer = useCallback(async (sdp, roomId) => {
+    roomIdRef.current = roomId;
     let stream = localStreamRef.current;
     if (!stream) {
       stream = await startLocalMedia();
     }
 
     let pc = peerConnectionRef.current;
-    if (!pc || pc.signalingState === 'closed') {
+    if (!pc || pc.signalingState === 'closed' || pc.signalingState !== 'stable') {
       pc = createPeerConnection(roomId);
     }
 
@@ -509,15 +521,6 @@ export function useWebRTC({
     };
 
     try {
-      if (pc.signalingState !== 'stable') {
-        console.log('[PulseCare] Resetting connection for fresh offer in state:', pc.signalingState);
-        pc = createPeerConnection(roomId);
-        pc.ondatachannel = (event) => {
-          dataChannelRef.current = event.channel;
-          attachDataChannelListeners(event.channel);
-        };
-      }
-
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
       await flushIceCandidates(pc);
 
@@ -557,18 +560,36 @@ export function useWebRTC({
    */
   const handleAddIceCandidate = useCallback(async (candidate) => {
     if (!candidate) return;
-    const pc = peerConnectionRef.current;
-    if (pc && pc.remoteDescription && pc.remoteDescription.type) {
-      try {
-        await pc.addIceCandidate(candidate);
-      } catch (err) {
-        console.warn('[PulseCare] Error adding ICE candidate:', err);
+    try {
+      const candObj = candidate.candidate ? candidate : { candidate };
+      const iceCandidate = new RTCIceCandidate(candObj);
+      const pc = peerConnectionRef.current;
+      if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+        await pc.addIceCandidate(iceCandidate);
+      } else {
+        // Buffer until setRemoteDescription completes
+        iceCandidateQueueRef.current.push(iceCandidate);
       }
-    } else {
-      // Buffer until setRemoteDescription completes
-      iceCandidateQueueRef.current.push(candidate);
+    } catch (err) {
+      console.warn('[PulseCare] Error buffering/adding ICE candidate:', err);
     }
   }, []);
+
+  /**
+   * Force WebRTC renegotiation / stream refresh
+   */
+  const forceRenegotiate = useCallback(async (roomId) => {
+    const targetRoom = roomId || roomIdRef.current;
+    if (!targetRoom) return;
+    console.log('[PulseCare] Forcing WebRTC renegotiation in room:', targetRoom);
+    if (peerConnectionRef.current) {
+      try {
+        peerConnectionRef.current.close();
+      } catch (e) {}
+      peerConnectionRef.current = null;
+    }
+    await initiateOffer(targetRoom);
+  }, [initiateOffer]);
 
   /**
    * End and cleanup consultation call (completely stops camera/mic hardware)
@@ -636,6 +657,7 @@ export function useWebRTC({
     handleAddIceCandidate,
     setDegradedMode,
     sendChatMessage,
+    forceRenegotiate,
     endCall,
   };
 }

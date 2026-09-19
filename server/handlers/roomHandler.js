@@ -1,3 +1,5 @@
+import { flushPendingRoomSignaling, clearRoomSignaling } from './signalingHandler.js';
+
 // In-memory state for 36-hour hackathon MVP (No database)
 const patientQueue = [];
 const socketRooms = new Map(); // socketId -> Set<roomId>
@@ -32,6 +34,9 @@ export function setupRoomHandlers(io, socket) {
       timestamp: Date.now()
     });
     console.log(`[PulseCare] Socket ${socket.id} (${role || 'peer'}) joined room ${roomId}`);
+
+    // Instantly flush any buffered offer and candidates to the joining peer (eliminates join race conditions)
+    flushPendingRoomSignaling(socket, roomId);
   });
 
   // Client leaves a consultation room explicitly
@@ -44,6 +49,7 @@ export function setupRoomHandlers(io, socket) {
       from: socket.id,
       reason: 'Remote peer left the consultation'
     });
+    clearRoomSignaling(roomId);
     console.log(`[PulseCare] Socket ${socket.id} left room ${roomId}`);
   });
 

@@ -28,6 +28,7 @@ export default function CallInterface({
   onSendMessage,
   isChatOpen = false,
   onToggleChat,
+  onReconnect = null,
   lang = 'en',
 }) {
   const isHi = lang === 'hi';
@@ -165,6 +166,7 @@ export default function CallInterface({
           isAudioOnly={isAudioOnly}
           peerName={doctor?.name || 'Dr. Ananya Sharma, MBBS, MD'}
           rtt={rtt}
+          onReconnect={onReconnect}
         />
 
         {/* Self Mini Tile */}
@@ -193,6 +195,7 @@ export default function CallInterface({
         isDegraded={isAudioOnly}
         isChatOpen={isChatOpen}
         onToggleChat={onToggleChat}
+        onReconnect={onReconnect}
         lang={lang}
       />
 

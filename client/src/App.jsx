@@ -114,26 +114,42 @@ export default function App() {
     onIncomingCall: async ({ callerId, roomId }) => {
       console.log(`[PulseCare] Incoming call from doctor ${callerId} in room ${roomId}`);
       setActiveRoomId(roomId);
-      setIncomingCall({
-        roomId,
-        callerId,
-        doctorName: 'Dr. Ananya Sharma (District Tele-Hub 3)',
-      });
-      playIncomingRingtone();
+      // Immediately join room so any server-buffered SDP offers & ICE candidates arrive
+      signaling.joinRoom(roomId, 'patient');
+
+      if (isPatientInCall || currentRoute === 'patient') {
+        // Patient is already on the tele-consultation screen waiting for MD: auto-connect
+        console.log('[PulseCare] Patient already on consultation screen, auto-activating media...');
+        setIsPatientInCall(true);
+        await webrtc.startLocalMedia();
+      } else {
+        setIncomingCall({
+          roomId,
+          callerId,
+          doctorName: 'Dr. Ananya Sharma (District Tele-Hub 3)',
+        });
+        playIncomingRingtone();
+      }
     },
     onOffer: async ({ sdp, roomId }) => {
       console.log('[PulseCare] Received SDP offer in room:', roomId);
       setActiveRoomId(roomId);
-      // If patient is not yet actively in a call, prompt incoming consultation modal
-      if (!isDoctorInCall && !isPatientInCall) {
-        setIncomingCall({
+
+      // If on patient screen or already in call, accept offer immediately
+      if (currentRoute === 'patient' || isPatientInCall) {
+        setIsPatientInCall(true);
+        stopIncomingRingtone();
+        setIncomingCall(null);
+        await webrtc.handleReceiveOffer(sdp, roomId);
+      } else if (!isDoctorInCall && !isPatientInCall) {
+        setIncomingCall((prev) => ({
+          ...(prev || {}),
           roomId,
           sdp,
           doctorName: 'Dr. Ananya Sharma (District Tele-Hub 3)',
-        });
+        }));
         playIncomingRingtone();
       } else {
-        // Active renegotiation
         await webrtc.handleReceiveOffer(sdp, roomId);
       }
     },
@@ -158,9 +174,9 @@ export default function App() {
     },
     onPeerJoined: async ({ peerId, roomId, role }) => {
       console.log(`[PulseCare] Peer ${peerId} (${role}) joined room ${roomId}`);
-      // If doctor is in call and patient joined, re-initiate offer so negotiation connects instantly
-      if (isDoctorInCall && role === 'patient') {
-        console.log('[PulseCare] Doctor re-initiating offer for newly joined patient peer');
+      // If doctor is in call, re-initiate offer & candidates so peer connects without manual refresh
+      if (isDoctorInCall) {
+        console.log('[PulseCare] Doctor re-negotiating offer for newly joined peer');
         await webrtc.initiateOffer(roomId);
       }
     },
@@ -176,6 +192,18 @@ export default function App() {
     },
   });
   signalingRef.current = signaling;
+
+  const handleReconnectConsultation = async () => {
+    if (activeRoomId) {
+      console.log('[PulseCare] User initiated manual WebRTC stream reconnection:', activeRoomId);
+      if (currentRoute === 'doctor' || isDoctorInCall) {
+        await webrtc.forceRenegotiate(activeRoomId);
+      } else {
+        await webrtc.startLocalMedia();
+        signaling.joinRoom(activeRoomId, 'patient');
+      }
+    }
+  };
 
   const handleAcceptIncomingCall = async () => {
     stopIncomingRingtone();
@@ -415,6 +443,7 @@ export default function App() {
                 onSendMessage={handleSendChatMessage}
                 isChatOpen={isChatOpen}
                 onToggleChat={() => setIsChatOpen(!isChatOpen)}
+                onReconnect={handleReconnectConsultation}
                 lang={lang}
               />
             ) : (
@@ -462,6 +491,7 @@ export default function App() {
                         peerName={selectedPatient?.name || 'Patient'}
                         rtt={simulatedRtt}
                         onStartMedia={webrtc.startLocalMedia}
+                        onReconnect={handleReconnectConsultation}
                       />
                       {/* Doctor Local Self Video */}
                       <VideoPlayer
@@ -486,6 +516,7 @@ export default function App() {
                       isDegraded={networkStatus === 'degraded'}
                       isChatOpen={isChatOpen}
                       onToggleChat={() => setIsChatOpen(!isChatOpen)}
+                      onReconnect={handleReconnectConsultation}
                       lang={lang}
                     />
 
