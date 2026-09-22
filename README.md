@@ -2,6 +2,7 @@
 > **Resilient Low-Bandwidth Telemedicine for Rural India (Companion to eSanjeevani)**
 
 PulseCare is a low-bandwidth, offline-first clinical consultation mesh designed for India's 100,000+ frontline village ASHA workers and PHC medical officers in fringe 2G/3G blocks.
+(Hackathon Project)
 
 ---
 
